@@ -1,17 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using GLPixelFormat = OpenTK.Graphics.OpenGL.PixelFormat;
-using BitmapPixelFormat = System.Drawing.Imaging.PixelFormat;
 
 using Duality.Editor;
 using Duality.Properties;
 using Duality.Drawing;
 using Duality.Cloning;
-
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
+using Duality.Backend;
 
 namespace Duality.Resources
 {
@@ -20,17 +14,11 @@ namespace Duality.Resources
 	/// </summary>
 	/// <seealso cref="Duality.Resources.Pixmap"/>
 	/// <seealso cref="Duality.Resources.RenderTarget"/>
-	[Serializable]
 	[ExplicitResourceReference(typeof(Pixmap))]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageTexture)]
 	public class Texture : Resource
 	{
-		/// <summary>
-		/// A Texture resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(Texture));
-		
 		/// <summary>
 		/// [GET] A Texture showing the Duality icon.
 		/// </summary>
@@ -79,7 +67,7 @@ namespace Duality.Resources
 			ContentProvider.AddContent(ContentPath_White, new Texture(Pixmap.White));
 			ContentProvider.AddContent(ContentPath_Checkerboard, new Texture(
 				Pixmap.Checkerboard, 
-				SizeMode.Default,
+				TextureSizeMode.Default,
 				TextureMagFilter.Nearest,
 				TextureMinFilter.Nearest,
 				TextureWrapMode.Repeat,
@@ -96,154 +84,6 @@ namespace Duality.Resources
 
 
 		/// <summary>
-		/// Defines how to handle pixel data without power-of-two dimensions.
-		/// </summary>
-		public enum SizeMode
-		{
-			/// <summary>
-			/// Enlarges the images dimensions without scaling the image, leaving
-			/// the new space empty. Texture coordinates are automatically adjusted in
-			/// order to display the image correctly. This preserves the images full
-			/// quality but prevents tiling, if not power-of-two anyway.
-			/// </summary>
-			Enlarge,
-			/// <summary>
-			/// Stretches the image to fit power-of-two dimensions and downscales it
-			/// again when displaying. This might blur the image slightly but allows
-			/// tiling it.
-			/// </summary>
-			Stretch,
-			/// <summary>
-			/// The images dimensions are not affected, as OpenGL uses an actual 
-			/// non-power-of-two texture. However, this might be unsupported on older hardware.
-			/// </summary>
-			NonPowerOfTwo,
-
-			/// <summary>
-			/// The default behaviour. Equals <see cref="Enlarge"/>.
-			/// </summary>
-			Default = Enlarge
-		}
-
-
-		/// <summary>
-		/// Refers to a null reference Texture.
-		/// </summary>
-		/// <seealso cref="ContentRef{T}.Null"/>
-		public static readonly ContentRef<Texture> None	= ContentRef<Texture>.Null;
-
-		private	static	bool			initialized		= false;
-		private	static	int				activeTexUnit	= 0;
-		private	static	Texture[]		curBound		= null;
-		private	static	TextureUnit[]	texUnits		= null;
-		private	static	float			maxAnisoLevel	= 0;
-
-		/// <summary>
-		/// [GET] The currently bound primary Texture.
-		/// </summary>
-		public static ContentRef<Texture> BoundTexPrimary
-		{
-			get { return new ContentRef<Texture>(curBound[0]); }
-		}
-		/// <summary>
-		/// [GET] The currently bound secondary Texture
-		/// </summary>
-		public static ContentRef<Texture> BoundTexSecondary
-		{
-			get { return new ContentRef<Texture>(curBound[1]); }
-		}
-		/// <summary>
-		/// [GET] The currently bound tertiary Texture
-		/// </summary>
-		public static ContentRef<Texture> BoundTexTertiary
-		{
-			get { return new ContentRef<Texture>(curBound[2]); }
-		}
-		/// <summary>
-		/// [GET] The currently bound quartary Texture
-		/// </summary>
-		public static ContentRef<Texture> BoundTexQuartary
-		{
-			get { return new ContentRef<Texture>(curBound[3]); }
-		}
-		/// <summary>
-		/// [GET] All Textures that are currently bound
-		/// </summary>
-		public static ContentRef<Texture>[] BoundTex
-		{
-			get 
-			{ 
-				ContentRef<Texture>[] result = new ContentRef<Texture>[curBound.Length];
-				for (int i = 0; i < result.Length; i++)
-				{
-					result[i] = new ContentRef<Texture>(curBound[i]);
-				}
-				return result;
-			}
-		}
-
-		private static void Init()
-		{
-			if (initialized) return;
-
-			GL.GetFloat((GetPName)ExtTextureFilterAnisotropic.MaxTextureMaxAnisotropyExt, out maxAnisoLevel);
-			
-			int numTexUnits;
-			GL.GetInteger(GetPName.MaxTextureImageUnits, out numTexUnits);
-			texUnits = new TextureUnit[numTexUnits];
-			curBound = new Texture[numTexUnits];
-
-			for (int i = 0; i < numTexUnits; i++)
-			{
-				texUnits[i] = (TextureUnit)((int)TextureUnit.Texture0 + i);
-			}
-
-			initialized = true;
-		}
-		/// <summary>
-		/// Binds the given Texture to a texture unit in order to use it for rendering.
-		/// </summary>
-		/// <param name="tex">The Texture to bind.</param>
-		/// <param name="texUnit">The texture unit where the Texture will be bound to.</param>
-		public static void Bind(ContentRef<Texture> tex, int texUnit = 0)
-		{
-			if (!initialized) Init();
-
-			Texture texRes = tex.IsExplicitNull ? null : (tex.Res ?? Checkerboard.Res);
-			if (curBound[texUnit] == texRes) return;
-			if (activeTexUnit != texUnit) GL.ActiveTexture(texUnits[texUnit]);
-			activeTexUnit = texUnit;
-
-			if (texRes == null)
-			{
-				GL.BindTexture(TextureTarget.Texture2D, 0);
-				GL.Disable(EnableCap.Texture2D);
-				curBound[texUnit] = null;
-			}
-			else
-			{
-				if (texRes.glTexId == 0)	throw new ArgumentException(string.Format("Specified texture '{0}' has no valid OpenGL texture Id! Maybe it hasn't been loaded / initialized properly?", texRes.Path), "tex");
-				if (texRes.Disposed)		throw new ArgumentException(string.Format("Specified texture '{0}' has already been deleted!", texRes.Path), "tex");
-					
-				GL.Enable(EnableCap.Texture2D);
-				GL.BindTexture(TextureTarget.Texture2D, texRes.glTexId);
-				curBound[texUnit] = texRes;
-			}
-		}
-		/// <summary>
-		/// Resets all Texture bindings to texture units beginning at a certain index.
-		/// </summary>
-		/// <param name="beginAtIndex">The first texture unit index from which on all bindings will be cleared.</param>
-		public static void ResetBinding(int beginAtIndex = 0)
-		{
-			if (!initialized) Init();
-			for (int i = beginAtIndex; i < texUnits.Length; i++)
-			{
-				Bind(None, i);
-			}
-		}
-
-		/// <summary>
 		/// Creates a new Texture Resource based on the specified Pixmap, saves it and returns a reference to it.
 		/// </summary>
 		/// <param name="pixmap"></param>
@@ -257,25 +97,25 @@ namespace Duality.Resources
 		}
 
 		
-		private	ContentRef<Pixmap>	basePixmap	= ContentRef<Pixmap>.Null;
+		private	ContentRef<Pixmap>	basePixmap	= null;
 		private	Vector2				size		= Vector2.Zero;
-		private	SizeMode			texSizeMode	= SizeMode.Default;
+		private	TextureSizeMode		texSizeMode	= TextureSizeMode.Default;
 		private	TextureMagFilter	filterMag	= TextureMagFilter.Linear;
 		private	TextureMinFilter	filterMin	= TextureMinFilter.LinearMipmapLinear;
-		private	TextureWrapMode		wrapX		= TextureWrapMode.ClampToEdge;
-		private	TextureWrapMode		wrapY		= TextureWrapMode.ClampToEdge;
-		private	PixelInternalFormat	pixelformat	= PixelInternalFormat.Rgba;
-		private	bool				anisoFilter		= false;
+		private	TextureWrapMode		wrapX		= TextureWrapMode.Clamp;
+		private	TextureWrapMode		wrapY		= TextureWrapMode.Clamp;
+		private	TexturePixelFormat	pixelformat	= TexturePixelFormat.Rgba;
+		private	bool				anisoFilter	= false;
 
-		[NonSerialized] private	int		pxWidth		= 0;
-		[NonSerialized] private	int		pxHeight	= 0;
-		[NonSerialized] private	int		glTexId		= 0;
-		[NonSerialized] private	float	pxDiameter	= 0.0f;
-		[NonSerialized] private	int		texWidth	= 0;
-		[NonSerialized] private	int		texHeight	= 0;
-		[NonSerialized] private	Vector2	uvRatio		= new Vector2(1.0f, 1.0f);
-		[NonSerialized] private	bool	needsReload	= true;
-		[NonSerialized] private	Rect[]	atlas		= null;
+		[DontSerialize] private	INativeTexture nativeTex = null;
+		[DontSerialize] private	int		pxWidth		= 0;
+		[DontSerialize] private	int		pxHeight	= 0;
+		[DontSerialize] private	float	pxDiameter	= 0.0f;
+		[DontSerialize] private	int		texWidth	= 0;
+		[DontSerialize] private	int		texHeight	= 0;
+		[DontSerialize] private	Vector2	uvRatio		= new Vector2(1.0f, 1.0f);
+		[DontSerialize] private	bool	needsReload	= true;
+		[DontSerialize] private	Rect[]	atlas		= null;
 
 
 		/// <summary>
@@ -285,7 +125,7 @@ namespace Duality.Resources
 		public int TexelWidth
 		{
 			get { return this.texWidth; }
-		}	//	G
+		}
 		/// <summary>
 		/// [GET] The Textures internal texel height
 		/// </summary>
@@ -293,7 +133,7 @@ namespace Duality.Resources
 		public int TexelHeight
 		{
 			get { return this.texHeight; }
-		}	//	G
+		}
 		/// <summary>
 		/// [GET] The Textures original pixel width
 		/// </summary>
@@ -301,7 +141,7 @@ namespace Duality.Resources
 		public int PixelWidth
 		{
 			get { return this.pxWidth; }
-		}	//	G
+		}
 		/// <summary>
 		/// [GET] The Textures original pixel height
 		/// </summary>
@@ -309,14 +149,15 @@ namespace Duality.Resources
 		public int PixelHeight
 		{
 			get { return this.pxHeight; }
-		}	//	G
+		}
 		/// <summary>
-		/// [GET] The Textures internal id value. You shouldn't need to use this value normally.
+		/// [GET] The backends native texture. You shouldn't use this unless you know exactly what you're doing.
 		/// </summary>
-		internal int OglTexId
+		[EditorHintFlags(MemberFlags.Invisible)]
+		public INativeTexture Native
 		{
-			get { return this.glTexId; }
-		}	//	G
+			get { return this.nativeTex; }
+		}
 		/// <summary>
 		/// [GET] UV (Texture) coordinates for the Textures lower right
 		/// </summary>
@@ -324,7 +165,7 @@ namespace Duality.Resources
 		public Vector2 UVRatio
 		{
 			get { return this.uvRatio; }
-		}	//	G
+		}
 		/// <summary>
 		/// [GET] Returns whether or not the texture uses mipmaps.
 		/// </summary>
@@ -336,7 +177,7 @@ namespace Duality.Resources
 				this.filterMin == TextureMinFilter.LinearMipmapNearest ||
 				this.filterMin == TextureMinFilter.NearestMipmapLinear ||
 				this.filterMin == TextureMinFilter.NearestMipmapNearest; }
-		}	//	G
+		}
 		/// <summary>
 		/// Indicates that the textures parameters have been changed in a way that will make it
 		/// necessary to reload its data before using it next time.
@@ -345,7 +186,7 @@ namespace Duality.Resources
 		public bool NeedsReload
 		{
 			get { return this.needsReload; }
-		}  //  G
+		} 
 		/// <summary>
 		/// [GET / SET] The Textures size. Readonly, when created from a <see cref="BasePixmap"/>.
 		/// </summary>
@@ -364,7 +205,7 @@ namespace Duality.Resources
 					this.needsReload = true;
 				}
 			}
-		}						//	GS
+		}
 		/// <summary>
 		/// [GET / SET] The Textures magnifying filter
 		/// </summary>
@@ -372,7 +213,7 @@ namespace Duality.Resources
 		{
 			get { return this.filterMag; }
 			set { if (this.filterMag != value) { this.filterMag = value; this.needsReload = true; } }
-		}		//	GS
+		}
 		/// <summary>
 		/// [GET / SET] The Textures minifying filter
 		/// </summary>
@@ -380,7 +221,7 @@ namespace Duality.Resources
 		{
 			get { return this.filterMin; }
 			set { if (this.filterMin != value) { this.filterMin = value; this.needsReload = true; } }
-		}		//	GS
+		}
 		/// <summary>
 		/// [GET / SET] Specifies whether this texture uses anisotropic filtering.
 		/// </summary>
@@ -388,7 +229,7 @@ namespace Duality.Resources
 		{
 			get { return this.anisoFilter; }
 			set { if (this.anisoFilter != value) { this.anisoFilter = value; this.needsReload = true; } }
-		}			//	GS
+		}
 		/// <summary>
 		/// [GET / SET] The Textures horizontal wrap mode
 		/// </summary>
@@ -396,7 +237,7 @@ namespace Duality.Resources
 		{
 			get { return this.wrapX; }
 			set { if (this.wrapX != value) { this.wrapX = value; this.needsReload = true; } }
-		}				//	GS
+		}
 		/// <summary>
 		/// [GET / SET] The Textures vertical wrap mode
 		/// </summary>
@@ -404,20 +245,20 @@ namespace Duality.Resources
 		{
 			get { return this.wrapY; }
 			set { if (this.wrapY != value) { this.wrapY = value; this.needsReload = true; } }
-		}				//	GS
+		}
 		/// <summary>
 		/// [GET / SET] The Textures pixel format
 		/// </summary>
-		public PixelInternalFormat PixelFormat
+		public TexturePixelFormat PixelFormat
 		{
 			get { return this.pixelformat; }
 			set { if (this.pixelformat != value) { this.pixelformat = value; this.needsReload = true; } }
-		}	//	GS
+		}
 		/// <summary>
 		/// [GET / SET] Handles how the Textures base Pixmap is adjusted in order to fit GPU texture size requirements (Power of Two dimensions)
 		/// </summary>
 		[EditorHintFlags(MemberFlags.AffectsOthers)]
-		public SizeMode TexSizeMode
+		public TextureSizeMode TexSizeMode
 		{
 			get { return this.texSizeMode; }
 			set 
@@ -429,7 +270,7 @@ namespace Duality.Resources
 					this.needsReload = true;
 				}
 			}
-		}				//	GS
+		}
 		/// <summary>
 		/// [GET / SET] Reference to a Pixmap that contains the pixel data that is or has been uploaded to the Texture
 		/// </summary>
@@ -438,7 +279,7 @@ namespace Duality.Resources
 		{
 			get { return this.basePixmap; }
 			set { if (this.basePixmap.Res != value.Res) { this.basePixmap = value; this.needsReload = true; } }
-		}		//	GS
+		}
 
 
 		/// <summary>
@@ -456,12 +297,12 @@ namespace Duality.Resources
 		/// <param name="wrapY">The OpenGL wrap mode on the texel y axis.</param>
 		/// <param name="format">The format in which OpenGL stores the pixel data.</param>
 		public Texture(ContentRef<Pixmap> basePixmap, 
-			SizeMode sizeMode			= SizeMode.Default, 
+			TextureSizeMode sizeMode	= TextureSizeMode.Default, 
 			TextureMagFilter filterMag	= TextureMagFilter.Linear, 
 			TextureMinFilter filterMin	= TextureMinFilter.LinearMipmapLinear,
-			TextureWrapMode wrapX		= TextureWrapMode.ClampToEdge,
-			TextureWrapMode wrapY		= TextureWrapMode.ClampToEdge,
-			PixelInternalFormat format	= PixelInternalFormat.Rgba)
+			TextureWrapMode wrapX		= TextureWrapMode.Clamp,
+			TextureWrapMode wrapY		= TextureWrapMode.Clamp,
+			TexturePixelFormat format	= TexturePixelFormat.Rgba)
 		{
 			this.filterMag = filterMag;
 			this.filterMin = filterMin;
@@ -482,12 +323,12 @@ namespace Duality.Resources
 		/// <param name="wrapY">The OpenGL wrap mode on the texel y axis.</param>
 		/// <param name="format">The format in which OpenGL stores the pixel data.</param>
 		public Texture(int width, int height, 
-			SizeMode sizeMode			= SizeMode.Default, 
+			TextureSizeMode sizeMode	= TextureSizeMode.Default, 
 			TextureMagFilter filterMag	= TextureMagFilter.Linear, 
 			TextureMinFilter filterMin	= TextureMinFilter.LinearMipmapLinear,
-			TextureWrapMode wrapX		= TextureWrapMode.ClampToEdge,
-			TextureWrapMode wrapY		= TextureWrapMode.ClampToEdge,
-			PixelInternalFormat format	= PixelInternalFormat.Rgba)
+			TextureWrapMode wrapX		= TextureWrapMode.Clamp,
+			TextureWrapMode wrapY		= TextureWrapMode.Clamp,
+			TexturePixelFormat format	= TexturePixelFormat.Rgba)
 		{
 			this.filterMag = filterMag;
 			this.filterMin = filterMin;
@@ -496,7 +337,7 @@ namespace Duality.Resources
 			this.pixelformat = format;
 			this.texSizeMode = sizeMode;
 			this.AdjustSize(width, height);
-			this.SetupOpenGLRes();
+			this.SetupNativeRes();
 		}
 
 		/// <summary>
@@ -520,17 +361,12 @@ namespace Duality.Resources
 		/// </summary>
 		/// <param name="basePixmap">The <see cref="Duality.Resources.Pixmap"/> that is used as pixel data source.</param>
 		/// <param name="sizeMode">Specifies behaviour in case the source data has non-power-of-two dimensions.</param>
-		public void LoadData(ContentRef<Pixmap> basePixmap, SizeMode sizeMode)
+		public void LoadData(ContentRef<Pixmap> basePixmap, TextureSizeMode sizeMode)
 		{
-			DualityApp.GuardSingleThreadState();
-			if (this.glTexId == 0) this.glTexId = GL.GenTexture();
+			if (this.nativeTex == null) this.nativeTex = DualityApp.GraphicsBackend.CreateTexture();
 			this.needsReload = false;
 			this.basePixmap = basePixmap;
 			this.texSizeMode = sizeMode;
-
-			int lastTexId;
-			GL.GetInteger(GetPName.TextureBinding2D, out lastTexId);
-			GL.BindTexture(TextureTarget.Texture2D, this.glTexId);
 
 			if (!this.basePixmap.IsExplicitNull)
 			{
@@ -546,11 +382,11 @@ namespace Duality.Resources
 					pixelData = Pixmap.Checkerboard.Res.MainLayer;
 
 				this.AdjustSize(pixelData.Width, pixelData.Height);
-				this.SetupOpenGLRes();
-				if (this.texSizeMode != SizeMode.NonPowerOfTwo &&
+				this.SetupNativeRes();
+				if (this.texSizeMode != TextureSizeMode.NonPowerOfTwo &&
 					(this.pxWidth != this.texWidth || this.pxHeight != this.texHeight))
 				{
-					if (this.texSizeMode == SizeMode.Enlarge)
+					if (this.texSizeMode == TextureSizeMode.Enlarge)
 					{
 						Pixmap.Layer oldData = pixelData;
 						pixelData = oldData.CloneResize(this.texWidth, this.texHeight);
@@ -563,10 +399,12 @@ namespace Duality.Resources
 				}
 
 				// Load pixel data to video memory
-				GL.TexImage2D(TextureTarget.Texture2D, 0, 
-					this.pixelformat, pixelData.Width, pixelData.Height, 0, 
-					GLPixelFormat.Rgba, PixelType.UnsignedByte, 
-					pixelData.Data);
+				this.nativeTex.LoadData(
+					this.pixelformat, 
+					pixelData.Width, pixelData.Height, 
+					pixelData.Data, 
+					ColorDataLayout.Rgba, 
+					ColorDataElementType.Byte);
 					
 				// Adjust atlas to represent UV coordinates
 				if (this.atlas != null)
@@ -587,34 +425,57 @@ namespace Duality.Resources
 			{
 				this.atlas = null;
 				this.AdjustSize(this.size.X, this.size.Y);
-				this.SetupOpenGLRes();
+				this.SetupNativeRes();
 			}
-
-			GL.BindTexture(TextureTarget.Texture2D, lastTexId);
 		}
 
 		/// <summary>
 		/// Retrieves the pixel data that is currently stored in video memory.
 		/// </summary>
 		/// <returns></returns>
-		public Pixmap.Layer RetrievePixelData()
+		public Pixmap.Layer GetPixelData()
 		{
-			DualityApp.GuardSingleThreadState();
-
-			int lastTexId;
-			GL.GetInteger(GetPName.TextureBinding2D, out lastTexId);
-			GL.BindTexture(TextureTarget.Texture2D, this.glTexId);
-			
-			byte[] data = new byte[this.texWidth * this.texHeight * 4];
-			GL.GetTexImage(TextureTarget.Texture2D, 0, 
-				GLPixelFormat.Rgba, PixelType.UnsignedByte, 
-				data);
-
-			GL.BindTexture(TextureTarget.Texture2D, lastTexId);
-
 			Pixmap.Layer result = new Pixmap.Layer();
-			result.SetPixelDataRgba(data, this.texWidth, this.texHeight);
+			this.GetPixelData(result);
 			return result;
+		}
+		/// <summary>
+		/// Retrieves the pixel data that is currently stored in video memory.
+		/// </summary>
+		/// <param name="target">The target image to store the retrieved pixel data in.</param>
+		public void GetPixelData(Pixmap.Layer target)
+		{
+			ColorRgba[] data = new ColorRgba[this.texWidth * this.texHeight];
+			this.GetPixelDataInternal(data);
+			target.SetPixelDataRgba(data, this.texWidth, this.texHeight);
+		}
+		/// <summary>
+		/// Retrieves the pixel data that is currently stored in video memory.
+		/// </summary>
+		/// <param name="targetBuffer">The buffer (Rgba8 format) to store all the pixel data in. 
+		/// Its byte length should be at least <see cref="TexelWidth"/> * <see cref="TexelHeight"/> * 4.</param>
+		/// <returns>The number of bytes that were read.</returns>
+		public int GetPixelData<T>(T[] targetBuffer) where T : struct
+		{
+			return this.GetPixelDataInternal(targetBuffer);
+		}
+
+		private int GetPixelDataInternal<T>(T[] buffer) where T : struct
+		{
+			int readBytes = this.texWidth * this.texHeight * 4;
+			if (readBytes == 0) return 0;
+
+			int readElements = readBytes / System.Runtime.InteropServices.Marshal.SizeOf(typeof(T));
+			if (buffer.Length < readElements)
+			{
+				throw new ArgumentException(
+					string.Format("The target buffer is too small. Its length needs to be at least {0}.", readBytes), 
+					"buffer");
+			}
+
+			this.nativeTex.GetData(buffer, ColorDataLayout.Rgba, ColorDataElementType.Byte);
+
+			return readElements;
 		}
 
 		/// <summary>
@@ -647,7 +508,7 @@ namespace Duality.Resources
 		}
 
 		/// <summary>
-		/// Processes the specified size based on the Textures <see cref="SizeMode"/>.
+		/// Processes the specified size based on the Textures <see cref="TextureSizeMode"/>.
 		/// </summary>
 		/// <param name="width"></param>
 		/// <param name="height"></param>
@@ -658,7 +519,7 @@ namespace Duality.Resources
 			this.pxHeight = MathF.RoundToInt(this.size.Y);
 			this.pxDiameter = MathF.Distance(this.pxWidth, this.pxHeight);
 
-			if (this.texSizeMode == SizeMode.NonPowerOfTwo)
+			if (this.texSizeMode == TextureSizeMode.NonPowerOfTwo)
 			{
 				this.texWidth = this.pxWidth;
 				this.texHeight = this.pxHeight;
@@ -670,7 +531,7 @@ namespace Duality.Resources
 				this.texHeight = MathF.NextPowerOfTwo(this.pxHeight);
 				if (this.pxWidth != this.texWidth || this.pxHeight != this.texHeight)
 				{
-					if (this.texSizeMode == SizeMode.Enlarge)
+					if (this.texSizeMode == TextureSizeMode.Enlarge)
 					{
 						this.uvRatio.X = (float)this.pxWidth / (float)this.texWidth;
 						this.uvRatio.Y = (float)this.pxHeight / (float)this.texHeight;
@@ -685,34 +546,17 @@ namespace Duality.Resources
 		/// <summary>
 		/// Sets up the Textures OpenGL resources, clearing previously uploaded pixel data.
 		/// </summary>
-		protected void SetupOpenGLRes()
+		protected void SetupNativeRes()
 		{
-			DualityApp.GuardSingleThreadState();
-			if (!initialized) Init();
-			if (this.glTexId == 0) this.glTexId = GL.GenTexture();
+			if (this.nativeTex == null) this.nativeTex = DualityApp.GraphicsBackend.CreateTexture();
 
-			int lastTexId;
-			GL.GetInteger(GetPName.TextureBinding2D, out lastTexId);
-			if (lastTexId != this.glTexId) GL.BindTexture(TextureTarget.Texture2D, this.glTexId);
-
-			// Set texture parameters
-			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)this.filterMin);
-			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)this.filterMag);
-			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)this.wrapX);
-			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)this.wrapY);
-
-			// Anisotropic filtering
-			GL.TexParameter(TextureTarget.Texture2D, (TextureParameterName) ExtTextureFilterAnisotropic.TextureMaxAnisotropyExt, this.anisoFilter ? maxAnisoLevel : 1.0f);
-
-			// If needed, care for Mipmaps
-			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.GenerateMipmap, this.HasMipmaps ? 1 : 0);
-
-			// Setup pixel format
-			GL.TexImage2D(TextureTarget.Texture2D, 0,
-				this.pixelformat, this.texWidth, this.texHeight, 0,
-				GLPixelFormat.Bgra, PixelType.UnsignedByte, IntPtr.Zero);
-
-			if (lastTexId != this.glTexId) GL.BindTexture(TextureTarget.Texture2D, lastTexId);
+			this.nativeTex.SetupEmpty(
+				this.pixelformat,
+				this.texWidth, this.texHeight,
+				this.filterMin, this.filterMag,
+				this.wrapX, this.wrapY,
+				this.anisoFilter ? 4 : 0,
+				this.HasMipmaps);
 		}
 
 		protected override void OnLoaded()
@@ -724,13 +568,11 @@ namespace Duality.Resources
 		{
 			base.OnDisposing(manually);
 
-			// Dispose unmanages Resources
-			if (DualityApp.ExecContext != DualityApp.ExecutionContext.Terminated &&
-				this.glTexId != 0)
+			// Dispose unmanaged Resources
+			if (this.nativeTex != null)
 			{
-				DualityApp.GuardSingleThreadState();
-				GL.DeleteTexture(this.glTexId);
-				this.glTexId = 0;
+				this.nativeTex.Dispose();
+				this.nativeTex = null;
 			}
 
 			// Get rid of big data references, so the GC can collect them.

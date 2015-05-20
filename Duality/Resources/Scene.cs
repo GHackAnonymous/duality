@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using OpenTK;
 using FarseerPhysics.Dynamics;
 
 using Duality.Editor;
@@ -21,15 +20,10 @@ namespace Duality.Resources
 	/// <see cref="Scene.Current"/> which represents a level, gamestate or a combination of both, depending
 	/// on you own design.
 	/// </summary>
-	[Serializable]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryNone)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageScene)]
 	public sealed class Scene : Resource
 	{
-		/// <summary>
-		/// A Scene resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(Scene));
 		private const float PhysicsAccStart = Time.MsPFMult;
 
 
@@ -240,13 +234,13 @@ namespace Duality.Resources
 		}
 		private static void OnGameObjectAdded(GameObjectEventArgs args)
 		{
-			args.Object.OnActivate();
+			if (args.Object.Active) args.Object.OnActivate();
 			if (GameObjectAdded != null) GameObjectAdded(current, args);
 		}
 		private static void OnGameObjectRemoved(GameObjectEventArgs args)
 		{
 			if (GameObjectRemoved != null) GameObjectRemoved(current, args);
-			args.Object.OnDeactivate();
+			if (args.Object.Active || args.Object.Disposed) args.Object.OnDeactivate();
 		}
 		private static void OnComponentAdded(ComponentEventArgs args)
 		{
@@ -271,14 +265,14 @@ namespace Duality.Resources
 		private	Vector2						globalGravity		= Vector2.UnitY * 33.0f;
 		private IRendererVisibilityStrategy	visibilityStrategy	= new DefaultRendererVisibilityStrategy();
 		private	GameObject[]				serializeObj		= null;
-		[NonSerialized]
+		[DontSerialize]
 		[CloneField(CloneFieldFlags.DontSkip)]
 		[CloneBehavior(typeof(GameObject), CloneBehavior.ChildObject)]
 		private	GameObjectManager					objectManager		= new GameObjectManager();
-		[NonSerialized]
+		[DontSerialize]
 		[CloneField(CloneFieldFlags.DontSkip)]
 		private	List<Component>						renderers			= new List<Component>();
-		[NonSerialized]
+		[DontSerialize]
 		[CloneField(CloneFieldFlags.DontSkip)]
 		private Dictionary<Type,List<Component>>	componentyByType	= new Dictionary<Type,List<Component>>();
 

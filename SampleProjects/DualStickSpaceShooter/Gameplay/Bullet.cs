@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using OpenTK;
-
 using Duality;
 using Duality.Drawing;
+using Duality.Audio;
 using Duality.Editor;
 using Duality.Resources;
 using Duality.Components;
@@ -15,7 +14,6 @@ using Duality.Components.Physics;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	[RequiredComponent(typeof(Transform))]
 	[RequiredComponent(typeof(RigidBody))]
 	public class Bullet : Component, ICmpCollisionListener, ICmpUpdatable

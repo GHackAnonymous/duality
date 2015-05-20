@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK;
-
 using FarseerPhysics.Dynamics;
 using FarseerPhysics.Collision.Shapes;
 
@@ -14,7 +12,6 @@ namespace Duality.Components.Physics
 	/// <summary>
 	/// Describes a double-sided edge loop (outline) in a <see cref="RigidBody">RigidBodies</see> shape.
 	/// </summary>
-	[Serializable]
 	public sealed class LoopShapeInfo : ShapeInfo
 	{
 		private	Vector2[]	vertices;

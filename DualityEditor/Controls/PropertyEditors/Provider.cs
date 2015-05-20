@@ -3,7 +3,6 @@ using System.Linq;
 using System.Collections.Generic;
 
 using AdamsLair.WinForms.PropertyEditing;
-using OpenTK;
 
 using Duality.Drawing;
 
@@ -20,7 +19,7 @@ namespace Duality.Editor.Controls.PropertyEditors
 				int bestScore = PropertyGrid.EditorPriority_None;
 				foreach (Type editorType in propertyEditorTypes)
 				{
-					var assignment = editorType.GetCustomAttributes<PropertyEditorAssignmentAttribute>().FirstOrDefault();
+					var assignment = editorType.GetAttributesCached<PropertyEditorAssignmentAttribute>().FirstOrDefault();
 					if (assignment == null) continue;
 					int score = assignment.MatchToProperty(baseType, context);
 					if (score > bestScore)
@@ -44,7 +43,7 @@ namespace Duality.Editor.Controls.PropertyEditors
 				Type bestType = null;
 				foreach (Type editorType in propertyEditorTypes)
 				{
-					var assignment = editorType.GetCustomAttributes<PropertyEditorAssignmentAttribute>().FirstOrDefault();
+					var assignment = editorType.GetAttributesCached<PropertyEditorAssignmentAttribute>().FirstOrDefault();
 					if (assignment == null) continue;
 					int score = assignment.MatchToProperty(baseType, context);
 					if (score > bestScore)

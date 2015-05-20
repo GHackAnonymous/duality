@@ -25,7 +25,6 @@ namespace Duality
 		private	static	Dictionary<string,MemberInfo>		memberResolveCache			= new Dictionary<string,MemberInfo>();
 		private	static	Dictionary<Type,bool>				plainOldDataTypeCache		= new Dictionary<Type,bool>();
 		private	static	Dictionary<MemberInfo,Attribute[]>	customMemberAttribCache		= new Dictionary<MemberInfo,Attribute[]>();
-		private	static	Attribute[]							customAssemblyAttribCache	= null;
 		private	static	Dictionary<KeyValuePair<Type,Type>,bool>	resRefCache			= new Dictionary<KeyValuePair<Type,Type>,bool>();
 
 		/// <summary>
@@ -98,7 +97,7 @@ namespace Duality
 							activator = () => System.Runtime.Serialization.FormatterServices.GetUninitializedObject(type);
 						}
 					}
-					catch (Exception e)
+					catch (Exception)
 					{
 						activator = nullObjectActivator;
 					}
@@ -217,7 +216,7 @@ namespace Duality
 		/// <typeparam name="T"></typeparam>
 		/// <param name="member"></param>
 		/// <returns></returns>
-		public static IEnumerable<T> GetCustomAttributes<T>(this MemberInfo member) where T : Attribute
+		public static IEnumerable<T> GetAttributesCached<T>(this MemberInfo member) where T : Attribute
 		{
 			Attribute[] result;
 			if (!customMemberAttribCache.TryGetValue(member, out result))
@@ -235,7 +234,7 @@ namespace Duality
 							MemberInfo[] interfaceMembers = interfaceType.GetMember(member.Name, member.MemberType, ReflectionHelper.BindInstanceAll);
 							foreach (MemberInfo interfaceMemberInfo in interfaceMembers)
 							{
-								IEnumerable<Attribute> subQuery = GetCustomAttributes<Attribute>(interfaceMemberInfo);
+								IEnumerable<Attribute> subQuery = GetAttributesCached<Attribute>(interfaceMemberInfo);
 								if (subQuery.Any())
 								{
 									query = query.Concat(subQuery);
@@ -251,24 +250,23 @@ namespace Duality
 				}
 				customMemberAttribCache[member] = result;
 			}
-			return result.OfType<T>();
+
+			if (typeof(T) == typeof(Attribute))
+				return result as IEnumerable<T>;
+			else
+				return result.OfType<T>();
 		}
 		/// <summary>
-		/// Returns all custom attributes of the specified Type that are declared at Assembly-level
-		/// within any of the currently available Duality Assemblies.
+		/// Returns all custom attributes of the specified Type that are attached to the specified member.
+		/// Inherites attributes are returned as well. This method is usually faster than <see cref="Attribute.GetCustomAttributes"/>
+		/// and similar .Net methods, because it caches previous results internally.
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
+		/// <param name="member"></param>
 		/// <returns></returns>
-		public static IEnumerable<T> GetCustomAssemblyAttributes<T>() where T : Attribute
+		public static bool HasAttributeCached<T>(this MemberInfo member) where T : Attribute
 		{
-			if (customAssemblyAttribCache == null)
-			{
-				customAssemblyAttribCache = 
-					DualityApp.GetDualityAssemblies()
-					.SelectMany(a => Attribute.GetCustomAttributes(a, true))
-					.ToArray();
-			}
-			return customAssemblyAttribCache.OfType<T>();
+			return GetAttributesCached<T>(member).Any();
 		}
 
 		/// <summary>
@@ -477,7 +475,7 @@ namespace Duality
 
 				bool foundIt = false;
 				bool foundAny = false;
-				foreach (ExplicitResourceReferenceAttribute refAttrib in GetCustomAttributes<ExplicitResourceReferenceAttribute>(sourceResType))
+				foreach (ExplicitResourceReferenceAttribute refAttrib in GetAttributesCached<ExplicitResourceReferenceAttribute>(sourceResType))
 				{
 					foundAny = true;
 					foreach (Type refType in refAttrib.ReferencedTypes)
@@ -678,7 +676,6 @@ namespace Duality
 			plainOldDataTypeCache.Clear();
 			resRefCache.Clear();
 			customMemberAttribCache.Clear();
-			customAssemblyAttribCache = null;
 		}
 		/// <summary>
 		/// Resolves a Type based on its <see cref="GetTypeId">type id</see>.

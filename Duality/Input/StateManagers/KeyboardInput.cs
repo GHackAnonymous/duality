@@ -1,7 +1,6 @@
 ﻿using System;
-using OpenTK.Input;
 
-namespace Duality
+namespace Duality.Input
 {
 	/// <summary>
 	/// Provides access to user keyboard input.
@@ -13,7 +12,8 @@ namespace Duality
 			public bool		IsAvailable		= false;
 			public bool		KeyRepeat		= true;
 			public int		KeyRepeatCount	= 0;
-			public bool[]	KeyPressed		= new bool[(int)Key.LastKey + 1];
+			public bool[]	KeyPressed		= new bool[(int)Key.Last + 1];
+			public string	CharInput		= string.Empty;
 
 			public State() {}
 			public State(State baseState)
@@ -25,6 +25,7 @@ namespace Duality
 				other.IsAvailable		= this.IsAvailable;
 				other.KeyRepeat			= this.KeyRepeat;
 				other.KeyRepeatCount	= this.KeyRepeatCount;
+				other.CharInput			= this.CharInput;
 				this.KeyPressed.CopyTo(other.KeyPressed, 0);
 			}
 			public void UpdateFromSource(IKeyboardInputSource source)
@@ -34,6 +35,7 @@ namespace Duality
 
 				this.KeyRepeat = source.KeyRepeat;
 				this.KeyRepeatCount = source.KeyRepeatCounter;
+				this.CharInput = source.CharInput ?? string.Empty;
 				for (int i = 0; i < this.KeyPressed.Length; i++)
 				{
 					this.KeyPressed[i] = source[(Key)i];
@@ -98,6 +100,13 @@ namespace Duality
 			}
 		}
 		/// <summary>
+		/// [GET] Returns the concatenated character input that was typed since the last input update.
+		/// </summary>
+		public string CharInput
+		{
+			get { return this.currentState.CharInput; }
+		}
+		/// <summary>
 		/// [GET] Returns whether a specific key is currently pressed.
 		/// </summary>
 		/// <param name="key"></param>
@@ -157,12 +166,12 @@ namespace Duality
 				{
 					this.anyNewKeydown = true;
 					if (this.KeyDown != null)
-						this.KeyDown(this, new KeyboardKeyEventArgs((Key)i));
+						this.KeyDown(this, new KeyboardKeyEventArgs(this, (Key)i, this.currentState.KeyPressed[i]));
 				}
 				if (!this.currentState.KeyPressed[i] && this.lastState.KeyPressed[i])
 				{
 					if (this.KeyUp != null)
-						this.KeyUp(this, new KeyboardKeyEventArgs((Key)i));
+						this.KeyUp(this, new KeyboardKeyEventArgs(this, (Key)i, this.currentState.KeyPressed[i]));
 				}
 			}
 			if (!this.anyNewKeydown && this.currentState.KeyRepeatCount != this.lastState.KeyRepeatCount && this.currentState.KeyRepeat)
@@ -172,7 +181,7 @@ namespace Duality
 					if (this.currentState.KeyPressed[i])
 					{
 						if (this.KeyDown != null)
-							this.KeyDown(this, new KeyboardKeyEventArgs((Key)i));
+							this.KeyDown(this, new KeyboardKeyEventArgs(this, (Key)i, this.currentState.KeyPressed[i]));
 					}
 				}
 			}

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-using OpenTK;
-
 using Duality.Components;
 using Duality.Cloning;
 using Duality.Properties;
@@ -18,16 +16,10 @@ namespace Duality.Resources
 	/// ensures that changes made to the Prefab propagate to all of its instances as well. It also keeps track of Properties that
 	/// have been deliberately modified in the editor and restores them after re-applying the original Prefabs data.
 	/// </summary>
-	[Serializable]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryNone)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImagePrefab)]
 	public class Prefab : Resource
 	{
-		/// <summary>
-		/// A Prefab resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(Prefab));
-
 		private static readonly ApplyPrefabContext PrefabContext = new ApplyPrefabContext();
 		private static readonly CloneProvider SharedPrefabProvider = new CloneProvider(PrefabContext);
 
@@ -197,10 +189,8 @@ namespace Duality.Resources
 	/// </summary>
 	/// <seealso cref="Prefab"/>
 	/// <seealso cref="GameObject"/>
-	[Serializable]
 	public sealed class PrefabLink
 	{
-		[Serializable]
 		private struct VarMod
 		{
 			public	PropertyInfo	prop;
@@ -271,7 +261,7 @@ namespace Duality.Resources
 		}
 
 
-		private PrefabLink() : this(null, ContentRef<Prefab>.Null) {}
+		private PrefabLink() : this(null, null) {}
 		/// <summary>
 		/// Creates a new PrefabLink, connecting a GameObject to a Prefab.
 		/// </summary>
@@ -414,13 +404,15 @@ namespace Duality.Resources
 
 				if (this.changes[i].prop != null && target != null) 
 				{
+					object applyVal = null;
 					try
 					{
-						object applyVal = null;
+
 						if (this.changes[i].prop.PropertyType.IsValueType)
 							applyVal = this.changes[i].val;
 						else
 							applyVal = this.changes[i].val.DeepClone();
+
 						this.changes[i].prop.SetValue(target, applyVal, null);
 					}
 					catch (Exception e)

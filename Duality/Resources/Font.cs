@@ -13,26 +13,17 @@ using Duality.Editor;
 using Duality.Cloning;
 using Duality.Properties;
 
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
-
 namespace Duality.Resources
 {
 	/// <summary>
 	/// Represents a font. While any system font or imported TrueType font can be used, they are internally
 	/// pre-rasterized and stored in a <see cref="Duality.Resources.Texture"/> with an <see cref="Duality.Resources.Pixmap.Atlas"/>.
 	/// </summary>
-	[Serializable]
 	[ExplicitResourceReference()]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageFont)]
 	public class Font : Resource
 	{
-		/// <summary>
-		/// A Font resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(Font));
-		
 		/// <summary>
 		/// A generic <see cref="MonoSpace">monospace</see> Font (Size 8) that has been loaded from your systems font library.
 		/// This is usually "Courier New".
@@ -107,11 +98,6 @@ namespace Duality.Resources
 		}
 
 		
-		/// <summary>
-		/// Refers to a null reference Font.
-		/// </summary>
-		/// <seealso cref="ContentRef{T}.Null"/>
-		public static readonly ContentRef<Font> None			= ContentRef<Font>.Null;
 		/// <summary>
 		/// A string containing all characters that are supported by Duality.
 		/// </summary>
@@ -221,18 +207,18 @@ namespace Duality.Resources
 		// Embedded custom font family
 		private	byte[]		customFamilyData	= null;
 		// Data that is automatically acquired while loading the font
-		[NonSerialized] private SysDrawFont	internalFont	= null;
-		[NonSerialized] private	GlyphData[]	glyphs			= null;
-		[NonSerialized] private	Material	mat				= null;
-		[NonSerialized] private	Pixmap		pixelData		= null;
-		[NonSerialized] private	Texture		texture			= null;
-		[NonSerialized] private	bool		needsReload		= true;
-		[NonSerialized] private	int			maxGlyphWidth	= 0;
-		[NonSerialized] private	int			height			= 0;
-		[NonSerialized] private	int			ascent			= 0;
-		[NonSerialized] private	int			bodyAscent		= 0;
-		[NonSerialized] private	int			descent			= 0;
-		[NonSerialized] private	int			baseLine		= 0;
+		[DontSerialize] private SysDrawFont	internalFont	= null;
+		[DontSerialize] private	GlyphData[]	glyphs			= null;
+		[DontSerialize] private	Material	mat				= null;
+		[DontSerialize] private	Pixmap		pixelData		= null;
+		[DontSerialize] private	Texture		texture			= null;
+		[DontSerialize] private	bool		needsReload		= true;
+		[DontSerialize] private	int			maxGlyphWidth	= 0;
+		[DontSerialize] private	int			height			= 0;
+		[DontSerialize] private	int			ascent			= 0;
+		[DontSerialize] private	int			bodyAscent		= 0;
+		[DontSerialize] private	int			descent			= 0;
+		[DontSerialize] private	int			baseLine		= 0;
 
 
 		/// <summary>
@@ -537,7 +523,6 @@ namespace Duality.Resources
 						kerningY[ascentSamples + bodySamples + k] = this.BaseLine + (k + 1) * this.Descent / descentSamples;
 				}
 
-				int[] c = new int[3];
 				for (int i = 0; i < SupportedChars.Length; ++i)
 				{
 					Pixmap.Layer glyphTemp = this.GetGlyphBitmap(SupportedChars[i]);
@@ -547,37 +532,57 @@ namespace Duality.Resources
 
 					if (SupportedChars[i] != ' ')
 					{
-						int pxIndex;
 						// Left side samples
-						for (int sampleIndex = 0; sampleIndex < this.glyphs[i].kerningSamplesLeft.Length; sampleIndex++)
 						{
-							this.glyphs[i].kerningSamplesLeft[sampleIndex] = glyphTemp.Width / 2;
-							for (int off = 0; off <= 2; off++)
+							int[] leftData = this.glyphs[i].kerningSamplesLeft;
+							int leftMid = glyphTemp.Width / 2;
+							int lastSampleY = 0;
+							for (int sampleIndex = 0; sampleIndex < leftData.Length; sampleIndex++)
 							{
-								pxIndex = MathF.Clamp(kerningY[sampleIndex] + off - 1, 0, glyphTemp.Height - 1) * glyphTemp.Width;
-								c[off] = 0;
-								while (glyphTemp.Data[pxIndex + c[off]].A == 0)
+								leftData[sampleIndex] = leftMid;
+
+								int beginY = MathF.Clamp(lastSampleY, 0, glyphTemp.Height - 1);
+								int endY = MathF.Clamp(kerningY[sampleIndex], 0, glyphTemp.Height);
+								if (sampleIndex == leftData.Length - 1) endY = glyphTemp.Height;
+								lastSampleY = endY;
+
+								for (int y = beginY; y < endY; y++)
 								{
-									c[off]++;
-									if (c[off] >= glyphTemp.Width / 2) break;
+									int x = 0;
+									while (glyphTemp[x, y].A <= 64)
+									{
+										x++;
+										if (x >= leftMid) break;
+									}
+									leftData[sampleIndex] = Math.Min(leftData[sampleIndex], x);
 								}
-								this.glyphs[i].kerningSamplesLeft[sampleIndex] = Math.Min(this.glyphs[i].kerningSamplesLeft[sampleIndex], c[off]);
 							}
 						}
+
 						// Right side samples
-						for (int sampleIndex = 0; sampleIndex < this.glyphs[i].kerningSamplesRight.Length; sampleIndex++)
 						{
-							this.glyphs[i].kerningSamplesRight[sampleIndex] = glyphTemp.Width / 2;
-							for (int off = 0; off <= 2; off++)
+							int[] rightData = this.glyphs[i].kerningSamplesRight;
+							int rightMid = (glyphTemp.Width + 1) / 2;
+							int lastSampleY = 0;
+							for (int sampleIndex = 0; sampleIndex < rightData.Length; sampleIndex++)
 							{
-								pxIndex = MathF.Clamp(kerningY[sampleIndex] + off - 1, 0, glyphTemp.Height - 1) * glyphTemp.Width + glyphTemp.Width - 1;
-								c[off] = 0;
-								while (glyphTemp.Data[pxIndex - c[off]].A == 0)
+								rightData[sampleIndex] = rightMid;
+
+								int beginY = MathF.Clamp(lastSampleY, 0, glyphTemp.Height - 1);
+								int endY = MathF.Clamp(kerningY[sampleIndex], 0, glyphTemp.Height);
+								if (sampleIndex == rightData.Length - 1) endY = glyphTemp.Height;
+								lastSampleY = endY;
+
+								for (int y = beginY; y < endY; y++)
 								{
-									c[off]++;
-									if (c[off] >= glyphTemp.Width / 2) break;
+									int x = glyphTemp.Width - 1;
+									while (glyphTemp[x, y].A <= 64)
+									{
+										x--;
+										if (x <= rightMid) break;
+									}
+									rightData[sampleIndex] = Math.Min(rightData[sampleIndex], glyphTemp.Width - 1 - x);
 								}
-								this.glyphs[i].kerningSamplesRight[sampleIndex] = Math.Min(this.glyphs[i].kerningSamplesRight[sampleIndex], c[off]);
 							}
 						}
 					}
@@ -761,7 +766,7 @@ namespace Duality.Resources
 			this.pixelData = new Pixmap(pixelLayer);
 			this.pixelData.Atlas = new List<Rect>(atlas);
 			this.texture = new Texture(this.pixelData, 
-				Texture.SizeMode.Enlarge, 
+				TextureSizeMode.Enlarge, 
 				this.IsPixelGridAligned ? TextureMagFilter.Nearest : TextureMagFilter.Linear,
 				this.IsPixelGridAligned ? TextureMinFilter.Nearest : TextureMinFilter.LinearMipmapLinear);
 

@@ -2,37 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK.Graphics.OpenGL;
-using OpenTK;
-
-using Duality.Editor;
 using Duality.Resources;
+using Duality.Backend;
 
 namespace Duality.Drawing
 {
+	[DontSerialize]
 	public class DrawDevice : IDrawDevice, IDisposable
 	{
-		private interface IDrawBatch
-		{
-			int SortIndex { get; }
-			float ZSortIndex { get; }
-			int VertexCount { get; }
-			VertexMode VertexMode { get; }
-			BatchInfo Material { get; }
-			int VertexTypeIndex { get; }
-
-			void UploadToVBO(List<IDrawBatch> batches);
-			void SetupVBO();
-			void FinishVBO();
-			void Render(IDrawDevice device, ref int vertexOffset, ref IDrawBatch lastBatchRendered);
-			void FinishRendering();
-
-			bool CanShareVBO(IDrawBatch other);
-			bool CanAppendJIT<T>(float invZSortAccuracy, float zSortIndex, BatchInfo material, VertexMode vertexMode) where T : struct, IVertexData;
-			void AppendJIT(object vertexData, int length);
-			bool CanAppend(IDrawBatch other);
-			void Append(IDrawBatch other);
-		}
 		private class DrawBatch<T> : IDrawBatch where T : struct, IVertexData
 		{
 			private static T[] uploadBuffer = null;
@@ -60,9 +37,9 @@ namespace Duality.Drawing
 			{
 				get { return this.vertexMode; }
 			}
-			public int VertexTypeIndex
+			public VertexDeclaration VertexDeclaration
 			{
-				get { return this.vertices[0].TypeIndex; }
+				get { return this.vertices[0].Declaration; }
 			}
 			public BatchInfo Material
 			{
@@ -83,7 +60,7 @@ namespace Duality.Drawing
 				// Determine sorting index for non-Z-Sort materials
 				if (!this.material.Technique.Res.NeedsZSort)
 				{
-					int vTypeSI = vertices[0].TypeIndex;
+					int vTypeSI = vertices[0].Declaration.TypeIndex;
 					int matHash = this.material.GetHashCode() % (1 << 23);
 
 					// Bit significancy is used to achieve sorting by multiple traits at once.
@@ -98,27 +75,22 @@ namespace Duality.Drawing
 				}
 			}
 
-			public void SetupVBO()
-			{
-				// Set up VBO
-				this.vertices[0].SetupVBO(this.material);
-			}
-			public void UploadToVBO(List<IDrawBatch> batches)
+			public void UploadVertices(IVertexUploader target, List<IDrawBatch> uploadBatches)
 			{
 				int vertexCount = 0;
 				T[] vertexData = null;
 
-				if (batches.Count == 1)
+				if (uploadBatches.Count == 1)
 				{
 					// Only one batch? Don't bother copying data
-					DrawBatch<T> b = batches[0] as DrawBatch<T>;
+					DrawBatch<T> b = uploadBatches[0] as DrawBatch<T>;
 					vertexData = b.vertices;
 					vertexCount = b.vertices.Length;
 				}
 				else
 				{
 					// Check how many vertices we got
-					vertexCount = batches.Sum(t => t.VertexCount);
+					vertexCount = uploadBatches.Sum(t => t.VertexCount);
 					
 					// Allocate a static / shared buffer for uploading vertices
 					if (uploadBuffer == null)
@@ -129,51 +101,32 @@ namespace Duality.Drawing
 					// Collect vertex data in one array
 					int curVertexPos = 0;
 					vertexData = uploadBuffer;
-					for (int i = 0; i < batches.Count; i++)
+					for (int i = 0; i < uploadBatches.Count; i++)
 					{
-						DrawBatch<T> b = batches[i] as DrawBatch<T>;
+						DrawBatch<T> b = uploadBatches[i] as DrawBatch<T>;
 						Array.Copy(b.vertices, 0, vertexData, curVertexPos, b.vertexCount);
 						curVertexPos += b.vertexCount;
 					}
 				}
 
-				// Submit vertex data to GPU
-				this.vertices[0].UploadToVBO(vertexData, vertexCount);
-			}
-			public void FinishVBO()
-			{
-				// Finish VBO
-				this.vertices[0].FinishVBO(this.material);
-			}
-			public void Render(IDrawDevice device, ref int vertexOffset, ref IDrawBatch lastBatchRendered)
-			{
-				if (lastBatchRendered == null || lastBatchRendered.Material != this.material)
-					this.material.SetupForRendering(device, lastBatchRendered == null ? null : lastBatchRendered.Material);
-
-				GL.DrawArrays((PrimitiveType)this.vertexMode, vertexOffset, this.vertexCount);
-
-				vertexOffset += this.vertexCount;
-				lastBatchRendered = this;
-			}
-			public void FinishRendering()
-			{
-				this.material.FinishRendering();
+				// Submit vertex data to the GPU
+				target.UploadBatchVertices<T>(this.vertices[0].Declaration, vertexData, vertexCount);
 			}
 
-			public bool CanShareVBO(IDrawBatch other)
+			public bool SameVertexType(IDrawBatch other)
 			{
 				return other is DrawBatch<T>;
 			}
 			public bool CanAppendJIT<U>(float invZSortAccuracy, float zSortIndex, BatchInfo material, VertexMode vertexMode) where U : struct, IVertexData
 			{
-				if (invZSortAccuracy > 0.0f && this.material.Technique.Res.NeedsZSort)
+				if (invZSortAccuracy > 0.0f)
 				{
 					if (Math.Abs(zSortIndex - this.ZSortIndex) > invZSortAccuracy) return false;
 				}
 				return 
 					vertexMode == this.vertexMode && 
 					this is DrawBatch<U> &&
-					IsVertexModeAppendable(this.VertexMode) &&
+					this.vertexMode.IsBatchableMode() &&
 					material == this.material;
 			}
 			public void AppendJIT(object vertexData, int length)
@@ -198,7 +151,7 @@ namespace Duality.Drawing
 				return
 					other.VertexMode == this.vertexMode && 
 					other is DrawBatch<T> &&
-					IsVertexModeAppendable(this.VertexMode) &&
+					this.vertexMode.IsBatchableMode() &&
 					other.Material == this.material;
 			}
 			public void Append(IDrawBatch other)
@@ -219,14 +172,6 @@ namespace Duality.Drawing
 					this.zSortIndex = CalcZSortIndex(this.vertices, this.vertexCount);
 			}
 
-			public static bool IsVertexModeAppendable(VertexMode mode)
-			{
-				return 
-					mode == VertexMode.Lines || 
-					mode == VertexMode.Points || 
-					mode == VertexMode.Quads || 
-					mode == VertexMode.Triangles;
-			}
 			public static float CalcZSortIndex(T[] vertices, int count = -1)
 			{
 				if (count < 0) count = vertices.Length;
@@ -265,7 +210,6 @@ namespace Duality.Drawing
 		private	List<IDrawBatch>	drawBufferZSort	= new List<IDrawBatch>();
 		private	int					numRawBatches	= 0;
 		private	ContentRef<RenderTarget> renderTarget = null;
-		private	uint				hndlPrimaryVBO		= 0;
 
 
 		public bool Disposed
@@ -365,12 +309,8 @@ namespace Duality.Drawing
 
 		~DrawDevice()
 		{
-			// We require finalization in the main thread due to graphics / handle Resources
-			DualityApp.DisposeLater(this);
+			this.Dispose(false);
 		}
-		/// <summary>
-		/// Disposes the DrawDevice.
-		/// </summary>
 		public void Dispose()
 		{
 			this.Dispose(true);
@@ -380,13 +320,7 @@ namespace Duality.Drawing
 		{
 			if (!this.disposed)
 			{
-				if (DualityApp.ExecContext != DualityApp.ExecutionContext.Terminated &&
-					this.hndlPrimaryVBO != 0)
-				{
-					DualityApp.GuardSingleThreadState();
-					GL.DeleteBuffers(1, ref this.hndlPrimaryVBO);
-					this.hndlPrimaryVBO = 0;
-				}
+				// Release Resources
 				this.disposed = true;
 			}
 		}
@@ -619,16 +553,6 @@ namespace Duality.Drawing
 				material = new BatchInfo(material);
 				material.Technique = DrawTechnique.Solid;
 			}
-			else if (material.Technique.Res.NeedsPreprocess)
-			{
-				material = new BatchInfo(material);
-				material.Technique.Res.PreprocessBatch<T>(this, material, ref vertexMode, ref vertexBuffer, ref vertexCount);
-				if (vertexCount == 0) return;
-				if (vertexBuffer == null || vertexBuffer.Length == 0) return;
-				if (vertexCount > vertexBuffer.Length) vertexCount = vertexBuffer.Length;
-				if (material.Technique == null || !material.Technique.IsAvailable)
-					material.Technique = DrawTechnique.Solid;
-			}
 			
 			// When rendering without depth writing, use z sorting everywhere - there's no real depth buffering!
 			bool zSort = !this.DepthWrite || material.Technique.Res.NeedsZSort;
@@ -657,65 +581,45 @@ namespace Duality.Drawing
 			this.GenerateProjection(new Rect(refSize), out this.matProjection);
 			this.matFinal = this.matModelView * this.matProjection;
 		}
-		public void BeginRendering(ClearFlag clearFlags, ColorRgba clearColor, float clearDepth)
+		public void PrepareForDrawcalls()
 		{
-			RenderTarget.Bind(this.renderTarget);
-
-			// Setup viewport
-			GL.Viewport((int)this.viewportRect.X, (int)this.viewportRect.Y, (int)this.viewportRect.W, (int)this.viewportRect.H);
-			GL.Scissor((int)this.viewportRect.X, (int)this.viewportRect.Y, (int)this.viewportRect.W, (int)this.viewportRect.H);
-
-			// Clear buffers
-			ClearBufferMask glClearMask = 0;
-			if ((clearFlags & ClearFlag.Color) != ClearFlag.None) glClearMask |= ClearBufferMask.ColorBufferBit;
-			if ((clearFlags & ClearFlag.Depth) != ClearFlag.None) glClearMask |= ClearBufferMask.DepthBufferBit;
-			GL.ClearColor((OpenTK.Graphics.Color4)clearColor);
-			GL.ClearDepth((double)clearDepth); // The "float version" is from OpenGL 4.1..
-			GL.Clear(glClearMask);
-
-			// Configure Rendering params
-			if (this.renderMode == RenderMatrix.OrthoScreen)
-			{
-				GL.Enable(EnableCap.ScissorTest);
-				GL.Enable(EnableCap.DepthTest);
-				GL.DepthFunc(DepthFunction.Always);
-			}
-			else
-			{
-				GL.Enable(EnableCap.ScissorTest);
-				GL.Enable(EnableCap.DepthTest);
-				GL.DepthFunc(DepthFunction.Lequal);
-			}
-
-			// Upload and adjust matrices
+			// Recalculate matrices according to current mode
 			this.UpdateMatrices();
-			GL.MatrixMode(MatrixMode.Modelview);
-			GL.LoadMatrix(ref this.matModelView);
-			GL.MatrixMode(MatrixMode.Projection);
-			GL.LoadMatrix(ref this.matProjection);
-			if (this.renderTarget.IsAvailable)
-			{
-				if (this.renderMode == RenderMatrix.OrthoScreen) GL.Translate(0.0f, RenderTarget.BoundRT.Res.Height * 0.5f, 0.0f);
-				GL.Scale(1.0f, -1.0f, 1.0f);
-				if (this.renderMode == RenderMatrix.OrthoScreen) GL.Translate(0.0f, -RenderTarget.BoundRT.Res.Height * 0.5f, 0.0f);
-			}
 		}
-		public void EndRendering()
+		public void Render(ClearFlag clearFlags, ColorRgba clearColor, float clearDepth)
 		{
+			if (DualityApp.GraphicsBackend == null) return;
+
 			// Process drawcalls
 			this.OptimizeBatches();
-			this.BeginBatchRendering();
-
-			int drawCalls = 0;
+			RenderOptions options = new RenderOptions
 			{
-				// Z-Independent: Sorted as needed by batch optimizer
-				drawCalls += this.RenderBatches(this.drawBuffer);
-				// Z-Sorted: Back to Front
-				drawCalls += this.RenderBatches(this.drawBufferZSort);
-			}
-			Profile.StatNumDrawcalls.Add(drawCalls);
+				ClearFlags = clearFlags,
+				ClearColor = clearColor,
+				ClearDepth = clearDepth,
+				Viewport = this.viewportRect,
+				RenderMode = this.renderMode,
+				ModelViewMatrix = this.matModelView,
+				ProjectionMatrix = this.matProjection,
+				Target = this.renderTarget.IsAvailable ? this.renderTarget.Res.Native : null
+			};
+			RenderStats stats = new RenderStats();
+			DualityApp.GraphicsBackend.BeginRendering(this, options, stats);
 
-			this.FinishBatchRendering();
+			{
+				if (this.pickingIndex == 0) Profile.TimeProcessDrawcalls.BeginMeasure();
+
+				// Z-Independent: Sorted as needed by batch optimizer
+				DualityApp.GraphicsBackend.Render(this.drawBuffer);
+
+				// Z-Sorted: Back to Front
+				DualityApp.GraphicsBackend.Render(this.drawBufferZSort);
+
+				if (this.pickingIndex == 0) Profile.TimeProcessDrawcalls.EndMeasure();
+			}
+			Profile.StatNumDrawcalls.Add(stats.DrawCalls);
+
+			DualityApp.GraphicsBackend.EndRendering();
 			this.drawBuffer.Clear();
 			this.drawBufferZSort.Clear();
 		}
@@ -827,72 +731,18 @@ namespace Duality.Drawing
 			return optimized;
 		}
 
-		private void BeginBatchRendering()
-		{
-			if (this.hndlPrimaryVBO == 0) GL.GenBuffers(1, out this.hndlPrimaryVBO);
-			GL.BindBuffer(BufferTarget.ArrayBuffer, this.hndlPrimaryVBO);
-		}
-		private int RenderBatches(List<IDrawBatch> buffer)
-		{
-			if (this.pickingIndex == 0) Profile.TimeProcessDrawcalls.BeginMeasure();
-
-			int drawCalls = 0;
-			List<IDrawBatch> batchesSharingVBO = new List<IDrawBatch>();
-			IDrawBatch lastBatchRendered = null;
-
-			IDrawBatch lastBatch = null;
-			for (int i = 0; i < buffer.Count; i++)
-			{
-				IDrawBatch currentBatch = buffer[i];
-				IDrawBatch nextBatch = (i < buffer.Count - 1) ? buffer[i + 1] : null;
-
-				if (lastBatch == null || lastBatch.CanShareVBO(currentBatch))
-				{
-					batchesSharingVBO.Add(currentBatch);
-				}
-
-				if (batchesSharingVBO.Count > 0 && (nextBatch == null || !currentBatch.CanShareVBO(nextBatch)))
-				{
-					int vertexOffset = 0;
-					batchesSharingVBO[0].UploadToVBO(batchesSharingVBO);
-					drawCalls++;
-
-					foreach (IDrawBatch renderBatch in batchesSharingVBO)
-					{
-						renderBatch.SetupVBO();
-						renderBatch.Render(this, ref vertexOffset, ref lastBatchRendered);
-						renderBatch.FinishVBO();
-						drawCalls++;
-					}
-
-					batchesSharingVBO.Clear();
-					lastBatch = null;
-				}
-				else
-					lastBatch = currentBatch;
-			}
-
-			if (lastBatchRendered != null)
-				lastBatchRendered.FinishRendering();
-
-			if (this.pickingIndex == 0) Profile.TimeProcessDrawcalls.EndMeasure();
-			return drawCalls;
-		}
-		private void FinishBatchRendering()
-		{
-			GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-		}
-
 		public static void RenderVoid(Rect viewportRect)
 		{
-			RenderTarget.Bind(ContentRef<RenderTarget>.Null);
-			
-			GL.Viewport((int)viewportRect.X, (int)viewportRect.Y, (int)viewportRect.W, (int)viewportRect.H);
-			GL.Scissor((int)viewportRect.X, (int)viewportRect.Y, (int)viewportRect.W, (int)viewportRect.H);
-
-			GL.ClearDepth(1.0d);
-			GL.ClearColor((OpenTK.Graphics.Color4)ColorRgba.TransparentBlack);
-			GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+			RenderOptions options = new RenderOptions
+			{
+				ClearFlags = ClearFlag.All,
+				ClearColor = ColorRgba.TransparentBlack,
+				ClearDepth = 1.0f,
+				Viewport = viewportRect,
+				RenderMode = RenderMatrix.OrthoScreen
+			};
+			DualityApp.GraphicsBackend.BeginRendering(null, options);
+			DualityApp.GraphicsBackend.EndRendering();
 		}
 	}
 }

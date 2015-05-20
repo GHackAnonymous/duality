@@ -3,24 +3,16 @@
 using Duality.Properties;
 using Duality.Editor;
 
-using OpenTK.Graphics.OpenGL;
-
 
 namespace Duality.Resources
 {
 	/// <summary>
 	/// Represents an OpenGL VertexShader.
 	/// </summary>
-	[Serializable]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageVertexShader)]
 	public class VertexShader : AbstractShader
 	{
-		/// <summary>
-		/// A VertexShader resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(VertexShader));
-
 		/// <summary>
 		/// [GET] A minimal VertexShader. It performs OpenGLs default transformation
 		/// and forwards a single texture coordinate and color to the fragment stage.
@@ -46,9 +38,9 @@ namespace Duality.Resources
 		}
 
 
-		protected override ShaderType OglShaderType
+		protected override ShaderType Type
 		{
-			get { return ShaderType.VertexShader; }
+			get { return ShaderType.Vertex; }
 		}
 
 		public VertexShader() : base(DefaultContent.MinimalVert) {}

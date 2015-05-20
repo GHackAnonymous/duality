@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK.Input;
 
-
-namespace Duality
+namespace Duality.Input
 {
-	public class GamepadButtonEventArgs : EventArgs
+	public class GamepadButtonEventArgs : UserInputEventArgs
 	{
 		private GamepadButton button;
 		private bool pressed;
@@ -21,7 +19,7 @@ namespace Duality
 			get { return this.pressed; }
 		}
 
-		public GamepadButtonEventArgs(GamepadButton button, bool pressed)
+		public GamepadButtonEventArgs(GamepadInput inputChannel, GamepadButton button, bool pressed) : base(inputChannel)
 		{
 			this.button = button;
 			this.pressed = pressed;

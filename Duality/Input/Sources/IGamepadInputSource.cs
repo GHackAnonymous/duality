@@ -1,18 +1,12 @@
 ﻿using System;
-using OpenTK.Input;
 
-namespace Duality
+namespace Duality.Input
 {
 	/// <summary>
 	/// Describes a source of gamepad user input. This is usually an input device.
 	/// </summary>
 	public interface IGamepadInputSource : IUserInputSource
 	{
-		/// <summary>
-		/// [GET] The type of gamepad that is represented by this source.
-		/// </summary>
-		GamePadType GamepadType { get; }
-
 		/// <summary>
 		/// [GET] Returns whether the specified gamepad button is currently pressed.
 		/// </summary>

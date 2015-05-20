@@ -5,7 +5,10 @@ using System.Text;
 
 namespace Duality.Cloning
 {
-	[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Field, AllowMultiple = false)]
+	/// <summary>
+	/// Specifies the cloning behavior of a certain class, struct or field.
+	/// </summary>
+	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Field, AllowMultiple = false)]
 	public class CloneBehaviorAttribute : Attribute
 	{
 		private Type			targetType;

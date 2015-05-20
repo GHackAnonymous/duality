@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using OpenTK;
-using OpenTK.Input;
-
 using Duality;
 using Duality.Editor;
 using Duality.Components;
@@ -13,7 +10,6 @@ using Duality.Resources;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	[RequiredComponent(typeof(Camera))]
 	public class CameraController : Component, ICmpUpdatable, ICmpInitializable
 	{

@@ -1,7 +1,7 @@
 ﻿using System;
-using OpenTK.Input;
+using System.Text;
 
-namespace Duality
+namespace Duality.Input
 {
 	/// <summary>
 	/// Describes a source of user keyboard input. This is usually an input device.
@@ -16,6 +16,10 @@ namespace Duality
 		/// [GET] Returns the current key repeat counter value. A key repeat event will be fired for each increment that isn't accompanied by a state change.
 		/// </summary>
 		int KeyRepeatCounter { get; }
+		/// <summary>
+		/// [GET] Returns the concatenated character input that was typed since the last input update.
+		/// </summary>
+		string CharInput { get; }
 		/// <summary>
 		/// [GET] Returns whether a specific key is currently pressed.
 		/// </summary>

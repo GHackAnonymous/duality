@@ -9,8 +9,6 @@ using Duality.Resources;
 
 using Duality.Editor.Properties;
 
-using OpenTK;
-
 namespace Duality.Editor
 {
 	public enum SandboxState
@@ -137,6 +135,9 @@ namespace Duality.Editor
 				curPath = Scene.CurrentPath;
 				Scene.Current.Dispose();
 			}
+
+			// Stopp all audio that might not have been taken care of manually by the user
+			DualityApp.Sound.StopAll();
 
 			Time.TimeScale = 1.0f;	// Reset time scale
 			Time.Resume(true);		// Reset any previously (user-)generated time freeze events

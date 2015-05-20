@@ -1,7 +1,5 @@
 ﻿using System;
 
-using OpenTK;
-
 using FarseerPhysics.Dynamics;
 using FarseerPhysics.Factories;
 using FarseerPhysics.Dynamics.Joints;
@@ -15,7 +13,6 @@ namespace Duality.Components.Physics
 	/// Constrains two RigidBodies as though connected using a rope that is fixed at
 	/// two world anchor points.
 	/// </summary>
-	[Serializable]
 	public sealed class PulleyJointInfo : JointInfo
 	{
 		private	Vector2		localAnchorA	= Vector2.Zero;

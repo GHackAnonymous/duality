@@ -78,7 +78,7 @@ namespace NightlyBuilder
 				Console.WriteLine("ERROR: {0}", e);
 				Console.ForegroundColor = ConsoleColor.Gray;
 				Console.WriteLine();
-				System.Threading.Thread.Sleep(10000);
+				Console.ReadLine();
 			}
 		}
 
@@ -92,12 +92,8 @@ namespace NightlyBuilder
 			// Build the target Solution
 			Console.WriteLine("================================ Build Solution ===============================");
 			{
-				var buildProperties = new Dictionary<string,string>(){ { "Configuration", "Release"} };
-				var buildRequest = new BuildRequestData(config.SolutionPath, buildProperties, null, new string[] { "Build" }, null);
-				var buildParameters = new BuildParameters();
-				//buildParameters.Loggers = new[] { new ConsoleLogger(LoggerVerbosity.Minimal) };
-				var buildResult = BuildManager.DefaultBuildManager.Build(buildParameters, buildRequest);
-				if (buildResult.OverallResult != BuildResultCode.Success)
+				bool buildSuccess = BuildVisualStudioSolution(config.SolutionPath, "Release");
+				if (!buildSuccess)
 					throw new ApplicationException("The project doesn't compile properly. Cannot proceed in this state.");
 
 				versionCore = FileVersionInfo.GetVersionInfo(Path.Combine(config.BuildResultDir, "Duality.dll"));
@@ -187,28 +183,33 @@ namespace NightlyBuilder
 			Console.WriteLine();
 
 			// Build the documentation
+			bool includeDocs =
+				!string.IsNullOrWhiteSpace(config.DocBuildResultDir) &&
+				!string.IsNullOrWhiteSpace(config.DocBuildResultFile);
 			if (!config.NoDocs)
 			{
 				Console.WriteLine("================================== Build Docs =================================");
 				{
-					var buildProperties = new Dictionary<string,string>(){ { "Configuration", "Release"} };
-					var buildRequest = new BuildRequestData(config.DocSolutionPath, buildProperties, null, new string[] { "Build" }, null);
-					var buildParameters = new BuildParameters();
-					buildParameters.Loggers = new[] { new ConsoleLogger(LoggerVerbosity.Minimal) };
-					var buildResult = BuildManager.DefaultBuildManager.Build(buildParameters, buildRequest);
-					if (buildResult.OverallResult != BuildResultCode.Success)
+					bool buildSuccess = BuildVisualStudioSolution(config.DocSolutionPath, "Release");
+					if (!buildSuccess)
 						throw new ApplicationException("Documentation Build Failure");
-					File.Copy(
-						Path.Combine(config.DocBuildResultDir, config.DocBuildResultFile), 
-						Path.Combine(config.BuildResultDir, config.DocBuildResultFile),
-						true);
+
 					Console.WriteLine("Documentation Build Successful");
+
+					if (includeDocs)
+					{
+						File.Copy(
+							Path.Combine(config.DocBuildResultDir, config.DocBuildResultFile), 
+							Path.Combine(config.BuildResultDir, config.DocBuildResultFile),
+							true);
+						Console.WriteLine("Documentation copied to build directory");
+					}
 				}
 				Console.WriteLine("===============================================================================");
 				Console.WriteLine();
 				Console.WriteLine();
 			}
-			else if (File.Exists(Path.Combine(config.DocBuildResultDir, config.DocBuildResultFile)))
+			else if (includeDocs && File.Exists(Path.Combine(config.DocBuildResultDir, config.DocBuildResultFile)))
 			{
 				Console.WriteLine("============================== Copy existing Docs =============================");
 				{
@@ -447,6 +448,36 @@ namespace NightlyBuilder
 				}
 			}
 			proc.WaitForExit();
+		}
+		
+		public static bool BuildVisualStudioSolution(string solutionFile, string configuration)
+		{
+			try
+			{
+				return _BuildVisualStudioSolution(solutionFile, configuration);
+			}
+			catch (FileNotFoundException e)
+			{
+				// This will be caught when the binding redirect from the old .Net MsBuild to the new VS MsBuild failed.
+				Console.WriteLine();
+				Console.WriteLine();
+				Console.ForegroundColor = ConsoleColor.Red;
+				Console.WriteLine("ERROR: {0}", e);
+				Console.WriteLine();
+				Console.WriteLine("This error usually means the binding redirect from the old .Net 4.0 MsBuild to the new Visual Studio MsBuild failed. To fix this, upgrade to any version of Visual Studio 2013.");
+				Console.ForegroundColor = ConsoleColor.Gray;
+				Console.WriteLine();
+				return false;
+			}
+		}
+		private static bool _BuildVisualStudioSolution(string solutionFile, string configuration)
+		{
+			var buildProperties = new Dictionary<string,string>(){ { "Configuration", configuration } };
+			var buildRequest = new BuildRequestData(solutionFile, buildProperties, null, new string[] { "Build" }, null);
+			var buildParameters = new BuildParameters();
+			buildParameters.Loggers = new[] { new ConsoleLogger(LoggerVerbosity.Minimal) };
+			var buildResult = BuildManager.DefaultBuildManager.Build(buildParameters, buildRequest);
+			return buildResult.OverallResult == BuildResultCode.Success;
 		}
 	}
 }

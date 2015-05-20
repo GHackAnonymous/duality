@@ -1,5 +1,4 @@
 ﻿using Duality;
-using OpenTK;
 using System;
 
 namespace Duality.Plugins.Steering
@@ -10,7 +9,6 @@ namespace Duality.Plugins.Steering
 	/// configure if one doens't have background knownledge about the implementation. 
 	/// In that case you should use <see cref="DefaultAgentCharacteristics"/>.
 	/// </summary>
-	[Serializable]
 	public class AdvancedAgentCharacteristics : IAgentCharacteristics
 	{
 		public const float DEFAULT_DIRECTION_FACTOR = 0.75f;

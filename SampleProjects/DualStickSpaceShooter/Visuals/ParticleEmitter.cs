@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK;
-
 using Duality;
 using Duality.Editor;
 using Duality.Resources;
@@ -13,7 +11,6 @@ using Duality.Drawing;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	public class ParticleEmitter
 	{
 		private Range		burstDelay			= 100.0f;
@@ -31,9 +28,9 @@ namespace DualStickSpaceShooter
 		private Range		spriteIndex			= 0;
 		private	float		depthMult			= 1.0f;
 
-		[NonSerialized]
+		[DontSerialize]
 		private int			burstCount			= 0;
-		[NonSerialized]
+		[DontSerialize]
 		private	float		burstTimer			= 0.0f;
 
 		[EditorHintDecimalPlaces(0)]

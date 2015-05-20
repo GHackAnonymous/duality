@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK.Input;
 
-
-namespace Duality
+namespace Duality.Input
 {
-	public class GamepadAxisEventArgs : EventArgs
+	public class GamepadAxisEventArgs : UserInputEventArgs
 	{
 		private GamepadAxis axis;
 		private float axisValue;
@@ -26,7 +24,7 @@ namespace Duality
 			get { return this.axisDelta; }
 		}
 
-		public GamepadAxisEventArgs(GamepadAxis axis, float axisValue, float axisDelta)
+		public GamepadAxisEventArgs(GamepadInput inputChannel, GamepadAxis axis, float axisValue, float axisDelta) : base(inputChannel)
 		{
 			this.axis = axis;
 			this.axisValue = axisValue;

@@ -1,7 +1,5 @@
 ﻿using System;
 
-using OpenTK;
-
 using FarseerPhysics.Dynamics;
 using FarseerPhysics.Factories;
 using FarseerPhysics.Dynamics.Joints;
@@ -14,7 +12,6 @@ namespace Duality.Components.Physics
 	/// <summary>
 	/// This joint allows the RigidBody to travel on a specific axis relative to another body. It can be limited to a certain area and driven by a motor force.
 	/// </summary>
-	[Serializable]
 	public sealed class PrismaticJointInfo : JointInfo
 	{
 		private	Vector2		localAnchorA	= Vector2.Zero;

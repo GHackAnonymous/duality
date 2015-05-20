@@ -13,7 +13,6 @@ using Duality.Components;
 using Duality.Components.Renderers;
 using Duality.Tests.Cloning.HelperObjects;
 
-using OpenTK;
 using NUnit.Framework;
 
 namespace Duality.Tests.Cloning
@@ -38,6 +37,15 @@ namespace Duality.Tests.Cloning
 
 			Assert.IsTrue(data.Equals(dataResult));
 			Assert.IsFalse(data.AnyReferenceEquals(dataResult));
+		}
+		[Test] public void CloneMemberInfo()
+		{
+			Random rnd = new Random();
+			TestMemberInfoData data = new TestMemberInfoData(rnd);
+			TestMemberInfoData dataResult = data.DeepClone();
+
+			Assert.AreNotSame(data, dataResult);
+			Assert.AreEqual(data, dataResult);
 		}
 		[Test] public void CopyToTarget()
 		{

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using OpenTK;
-
 using Duality;
 using Duality.Editor;
 using Duality.Components;
@@ -12,10 +10,10 @@ using Duality.Components.Physics;
 using Duality.Components.Renderers;
 using Duality.Resources;
 using Duality.Drawing;
+using Duality.Audio;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	[RequiredComponent(typeof(Ship))]
 	public class EnemyClaymore : Component, ICmpUpdatable, ICmpInitializable, ICmpCollisionListener, ICmpMessageListener
 	{
@@ -35,7 +33,6 @@ namespace DualStickSpaceShooter
 			Idle
 		}
 
-		[Serializable]
 		private struct SpikeState
 		{
 			public float OpenValue;
@@ -61,10 +58,10 @@ namespace DualStickSpaceShooter
 		private	SpikeState[]				spikeState		= new SpikeState[4];
 		private	ContentRef<EnemyBlueprint>	blueprint		= null;
 
-		[NonSerialized] private AnimSpriteRenderer	eye				= null;
-		[NonSerialized] private SpriteRenderer[]	spikes			= null;
-		[NonSerialized] private SoundInstance		moveSoundLoop	= null;
-		[NonSerialized] private SoundInstance		dangerSoundLoop	= null;
+		[DontSerialize] private AnimSpriteRenderer	eye				= null;
+		[DontSerialize] private SpriteRenderer[]	spikes			= null;
+		[DontSerialize] private SoundInstance		moveSoundLoop	= null;
+		[DontSerialize] private SoundInstance		dangerSoundLoop	= null;
 		
 		public BehaviorFlags Behavior
 		{

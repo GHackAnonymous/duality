@@ -8,15 +8,11 @@ using Duality.Resources;
 using Duality.Cloning;
 using Duality.Properties;
 
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
-
 namespace Duality.Components.Renderers
 {
 	/// <summary>
 	/// Renders an animated sprite to represent the <see cref="GameObject"/>.
 	/// </summary>
-	[Serializable]
 	[ManuallyCloned]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageAnimSpriteRenderer)]
@@ -65,10 +61,10 @@ namespace Duality.Components.Renderers
 		private	bool		animPaused			= false;
 		private	List<int>	customFrameSequence	= null;
 
-		[NonSerialized] private int		curAnimFrame		= 0;
-		[NonSerialized] private int		nextAnimFrame		= 0;
-		[NonSerialized] private float	curAnimFrameFade	= 0.0f;
-		[NonSerialized] private	VertexC1P3T4A1[]	verticesSmooth	= null;
+		[DontSerialize] private int		curAnimFrame		= 0;
+		[DontSerialize] private int		nextAnimFrame		= 0;
+		[DontSerialize] private float	curAnimFrameFade	= 0.0f;
+		[DontSerialize] private	VertexC1P3T4A1[]	verticesSmooth	= null;
 
 
 		/// <summary>
@@ -398,28 +394,28 @@ namespace Duality.Components.Renderers
 			vertices[1].Pos.Y = posTemp.Y + edge2.Y;
 			vertices[1].Pos.Z = posTemp.Z + this.VertexZOffset;
 			vertices[1].TexCoord.X = uvRect.X;
-			vertices[1].TexCoord.Y = uvRect.MaximumY;
+			vertices[1].TexCoord.Y = uvRect.MaxY;
 			vertices[1].TexCoord.Z = uvRectNext.X;
-			vertices[1].TexCoord.W = uvRectNext.MaximumY;
+			vertices[1].TexCoord.W = uvRectNext.MaxY;
 			vertices[1].Color = mainClr;
 			vertices[1].Attrib = curAnimFrameFade;
 
 			vertices[2].Pos.X = posTemp.X + edge3.X;
 			vertices[2].Pos.Y = posTemp.Y + edge3.Y;
 			vertices[2].Pos.Z = posTemp.Z + this.VertexZOffset;
-			vertices[2].TexCoord.X = uvRect.MaximumX;
-			vertices[2].TexCoord.Y = uvRect.MaximumY;
-			vertices[2].TexCoord.Z = uvRectNext.MaximumX;
-			vertices[2].TexCoord.W = uvRectNext.MaximumY;
+			vertices[2].TexCoord.X = uvRect.MaxX;
+			vertices[2].TexCoord.Y = uvRect.MaxY;
+			vertices[2].TexCoord.Z = uvRectNext.MaxX;
+			vertices[2].TexCoord.W = uvRectNext.MaxY;
 			vertices[2].Color = mainClr;
 			vertices[2].Attrib = curAnimFrameFade;
 				
 			vertices[3].Pos.X = posTemp.X + edge4.X;
 			vertices[3].Pos.Y = posTemp.Y + edge4.Y;
 			vertices[3].Pos.Z = posTemp.Z + this.VertexZOffset;
-			vertices[3].TexCoord.X = uvRect.MaximumX;
+			vertices[3].TexCoord.X = uvRect.MaxX;
 			vertices[3].TexCoord.Y = uvRect.Y;
-			vertices[3].TexCoord.Z = uvRectNext.MaximumX;
+			vertices[3].TexCoord.Z = uvRectNext.MaxX;
 			vertices[3].TexCoord.W = uvRectNext.Y;
 			vertices[3].Color = mainClr;
 			vertices[3].Attrib = curAnimFrameFade;
@@ -478,7 +474,7 @@ namespace Duality.Components.Renderers
 
 			Rect uvRect;
 			Rect uvRectNext;
-			bool smoothShaderInput = tech != null && tech.PreferredVertexFormat == DrawTechnique.VertexType_C1P3T4A1;
+			bool smoothShaderInput = tech != null && tech.PreferredVertexFormat == VertexC1P3T4A1.Declaration;
 			this.GetAnimData(mainTex, tech, smoothShaderInput, out uvRect, out uvRectNext);
 			
 			if (!smoothShaderInput)

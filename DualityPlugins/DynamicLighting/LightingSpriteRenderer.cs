@@ -1,6 +1,4 @@
 ﻿using System;
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
 
 using Duality;
 using Duality.Editor;
@@ -15,13 +13,12 @@ namespace Duality.Plugins.DynamicLighting
 	/// <summary>
 	/// Renders a sprite using dynamic lighting, either per-vertex or per-pixel, depending on the DrawTechnique that is used.
 	/// </summary>
-	[Serializable]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(DynLightRes), DynLightResNames.IconComponentLightingSpriteRenderer)]
 	public class LightingSpriteRenderer : SpriteRenderer
 	{
 		private	float	vertexTranslucency	= 0.0f;
-		[NonSerialized]	private	VertexC1P3T2A4[]	verticesLight	= null;
+		[DontSerialize]	private	VertexC1P3T2A4[]	verticesLight	= null;
 
 		/// <summary>
 		/// [GET / SET] Specifies the objects translucency for Light when using vertex lighting.
@@ -96,22 +93,22 @@ namespace Duality.Plugins.DynamicLighting
 			vertices[1].Pos.Y = posTemp.Y + edge2.Y;
 			vertices[1].Pos.Z = posTemp.Z + this.VertexZOffset;
 			vertices[1].TexCoord.X = uvRect.X;
-			vertices[1].TexCoord.Y = uvRect.MaximumY;
+			vertices[1].TexCoord.Y = uvRect.MaxY;
 			vertices[1].Color = mainClr;
 			vertices[1].Attrib = perPixel ? objRotMat : vertexLight[1];
 
 			vertices[2].Pos.X = posTemp.X + edge3.X;
 			vertices[2].Pos.Y = posTemp.Y + edge3.Y;
 			vertices[2].Pos.Z = posTemp.Z + this.VertexZOffset;
-			vertices[2].TexCoord.X = uvRect.MaximumX;
-			vertices[2].TexCoord.Y = uvRect.MaximumY;
+			vertices[2].TexCoord.X = uvRect.MaxX;
+			vertices[2].TexCoord.Y = uvRect.MaxY;
 			vertices[2].Color = mainClr;
 			vertices[2].Attrib = perPixel ? objRotMat : vertexLight[2];
 				
 			vertices[3].Pos.X = posTemp.X + edge4.X;
 			vertices[3].Pos.Y = posTemp.Y + edge4.Y;
 			vertices[3].Pos.Z = posTemp.Z + this.VertexZOffset;
-			vertices[3].TexCoord.X = uvRect.MaximumX;
+			vertices[3].TexCoord.X = uvRect.MaxX;
 			vertices[3].TexCoord.Y = uvRect.Y;
 			vertices[3].Color = mainClr;
 			vertices[3].Attrib = perPixel ? objRotMat : vertexLight[3];

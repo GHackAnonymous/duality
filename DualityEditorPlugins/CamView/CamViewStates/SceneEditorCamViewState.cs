@@ -13,8 +13,6 @@ using Duality.Editor.Forms;
 using Duality.Editor.UndoRedoActions;
 using Duality.Editor.Plugins.CamView.UndoRedoActions;
 
-using OpenTK;
-
 namespace Duality.Editor.Plugins.CamView.CamViewStates
 {
 	public class SceneEditorCamViewState : CamViewState
@@ -421,10 +419,10 @@ namespace Duality.Editor.Plugins.CamView.CamViewStates
 		}
 		private void ClearContextMenu()
 		{
-			if (this.LocalGLControl == null || this.LocalGLControl.ContextMenu == null)
+			if (this.RenderableSite == null || this.RenderableControl.ContextMenu == null)
 				return;
 
-			this.LocalGLControl.ContextMenu.MenuItems.Clear();
+			this.RenderableControl.ContextMenu.MenuItems.Clear();
 		}
 	}
 }

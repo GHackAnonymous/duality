@@ -12,7 +12,6 @@ using Duality.Resources;
 using Duality.Components;
 using Duality.Components.Renderers;
 
-using OpenTK;
 using NUnit.Framework;
 
 namespace Duality.Tests.Cloning.HelperObjects
@@ -22,9 +21,9 @@ namespace Duality.Tests.Cloning.HelperObjects
 		public string StringField;
 		[CloneField(CloneFieldFlags.Skip)]
 		public int SkipField;
-		[NonSerialized]
+		[DontSerialize]
 		public int NonSerializedSkipField;
-		[NonSerialized]
+		[DontSerialize]
 		[CloneField(CloneFieldFlags.DontSkip)]
 		public int NonSerializedField;
 		public AlwaysSkippedObject SkippedObject;

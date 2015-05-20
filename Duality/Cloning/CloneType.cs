@@ -202,19 +202,20 @@ namespace Duality.Cloning
 			List<CloneField> fieldData = new List<CloneField>();
 			foreach (FieldInfo field in this.type.GetAllFields(ReflectionHelper.BindInstanceAll))
 			{
-				if (field.GetCustomAttributes<ManuallyClonedAttribute>().Any()) continue;
-				if (field.DeclaringType.GetCustomAttributes<ManuallyClonedAttribute>().Any()) continue;
+				if (field.IsInitOnly) continue;
+				if (field.HasAttributeCached<ManuallyClonedAttribute>()) continue;
+				if (field.DeclaringType.HasAttributeCached<ManuallyClonedAttribute>()) continue;
 
 				CloneFieldFlags flags = CloneFieldFlags.None;
-				CloneFieldAttribute fieldAttrib = field.GetCustomAttributes<CloneFieldAttribute>().FirstOrDefault();
+				CloneFieldAttribute fieldAttrib = field.GetAttributesCached<CloneFieldAttribute>().FirstOrDefault();
 				if (fieldAttrib != null) flags = fieldAttrib.Flags;
 
-				if (field.IsNotSerialized && !flags.HasFlag(CloneFieldFlags.DontSkip))
+				if (field.HasAttributeCached<DontSerializeAttribute>() && !flags.HasFlag(CloneFieldFlags.DontSkip))
 					continue;
 				if (flags.HasFlag(CloneFieldFlags.Skip))
 					continue;
 
-				CloneBehaviorAttribute behaviorAttrib = field.GetCustomAttributes<CloneBehaviorAttribute>().FirstOrDefault();
+				CloneBehaviorAttribute behaviorAttrib = field.GetAttributesCached<CloneBehaviorAttribute>().FirstOrDefault();
 				CloneType fieldType = CloneProvider.GetCloneType(field.FieldType);
 				bool isAlwaysReference = 
 					(behaviorAttrib != null) && 

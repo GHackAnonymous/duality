@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK;
-
 using FarseerPhysics.Dynamics;
 using FarseerPhysics.Collision.Shapes;
 
@@ -15,10 +13,9 @@ namespace Duality.Components.Physics
 	/// <summary>
 	/// Describes a <see cref="RigidBody">Colliders</see> primitive shape. A Colliders overall shape may be combined of any number of primitive shapes.
 	/// </summary>
-	[Serializable]
 	public abstract class ShapeInfo
 	{
-		[NonSerialized]	
+		[DontSerialize]	
 		protected	Fixture		fixture		= null;
 		[CloneBehavior(CloneBehavior.WeakReference)]
 		private		RigidBody	parent		= null;

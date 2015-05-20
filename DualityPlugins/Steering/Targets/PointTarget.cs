@@ -1,9 +1,7 @@
-﻿using OpenTK;
-using System;
+﻿using System;
 
 namespace Duality.Plugins.Steering
 {
-	[Serializable]
 	public class PointTarget : ISteeringTarget
 	{
 		private Vector2 location;

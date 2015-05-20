@@ -10,10 +10,11 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Duality.Editor.Plugins.Base</RootNamespace>
     <AssemblyName>EditorBase.editor</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,6 +24,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,6 +33,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="AdamsLair.WinForms, Version=1.0.16.0, Culture=neutral, processorArchitecture=MSIL">
@@ -40,14 +43,6 @@
     <Reference Include="Aga.Controls, Version=1.7.2.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\packages\AdamsLair.TreeViewAdv.1.7.2.0\lib\net20\Aga.Controls.dll</HintPath>
-    </Reference>
-    <Reference Include="OpenTK, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\AdamsLair.OpenTK.1.1.1.0\lib\net20\OpenTK.dll</HintPath>
-    </Reference>
-    <Reference Include="OpenTK.GLControl, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\AdamsLair.OpenTK.GLControl.1.1.1.0\lib\net20\OpenTK.GLControl.dll</HintPath>
     </Reference>
     <Reference Include="PopupControl, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\AdamsLair.WinForms.PopupControl.1.0.0.0\lib\net40\PopupControl.dll</HintPath>
@@ -65,20 +60,44 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EditorActions.cs" />
+    <Compile Include="DataConverters\ComponentFromSound.cs" />
+    <Compile Include="DataConverters\ComponentFromMaterial.cs" />
+    <Compile Include="DataConverters\ComponentFromFont.cs" />
+    <Compile Include="DataConverters\BatchInfoFromMaterial.cs" />
+    <Compile Include="DataConverters\SoundFromAudioData.cs" />
+    <Compile Include="DataConverters\PixmapFromTexture.cs" />
+    <Compile Include="DataConverters\TextureFromPixmap.cs" />
+    <Compile Include="DataConverters\TextureFromMaterial.cs" />
+    <Compile Include="DataConverters\MaterialFromTexture.cs" />
+    <Compile Include="DataConverters\MaterialFromBatchInfo.cs" />
+    <Compile Include="DataConverters\PrefabFromGameObject.cs" />
+    <Compile Include="DataConverters\GameObjFromComponents.cs" />
+    <Compile Include="DataConverters\GameObjFromPrefab.cs" />
+    <Compile Include="EditorActions\AudioDataToSound.cs" />
+    <Compile Include="EditorActions\FocusGameObject.cs" />
+    <Compile Include="EditorActions\OpenScene.cs" />
+    <Compile Include="EditorActions\InstantiatePrefab.cs" />
+    <Compile Include="EditorActions\OpenResource.cs" />
+    <Compile Include="EditorActions\ShaderToProgram.cs" />
+    <Compile Include="EditorActions\TextureToMaterial.cs" />
+    <Compile Include="EditorActions\PixmapToTexture.cs" />
+    <Compile Include="EditorActions\FocusComponent.cs" />
     <Compile Include="EditorBasePlugin.cs" />
     <Compile Include="Importers\AudioDataFileImporter.cs" />
     <Compile Include="Importers\FontFileImporter.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DataConverters.cs" />
+    <Compile Include="DataConverters\AudioDataFromSound.cs" />
+    <Compile Include="PreviewGenerators\PixmapPreviewGenerator.cs" />
+    <Compile Include="PreviewGenerators\AudioDataPreviewGenerator.cs" />
+    <Compile Include="PreviewGenerators\SoundPreviewGenerator.cs" />
     <Compile Include="Properties\EditorBaseRes.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>EditorBaseRes.resx</DependentUpon>
     </Compile>
     <Compile Include="Properties\EditorBaseResCache.cs" />
-    <Compile Include="PreviewGenerators.cs" />
+    <Compile Include="PreviewGenerators\FontPreviewGenerator.cs" />
     <Compile Include="PropertyEditors\BatchInfoPropertyEditor.cs" />
     <Compile Include="PropertyEditors\ComponentPropertyEditor.cs" />
     <Compile Include="PropertyEditors\Components\RigidBodyPropertyEditor.cs" />
@@ -128,6 +147,10 @@
     <ProjectReference Include="..\..\DualityEditor\DualityEditor.csproj">
       <Project>{9FB9F397-FD39-460C-A9AD-B4780D19945F}</Project>
       <Name>DualityEditor</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\DualityPrimitives\DualityPrimitives.csproj">
+      <Project>{c87a6a2f-e537-48fa-a789-3c54cf29cc09}</Project>
+      <Name>DualityPrimitives</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\Duality\Duality.csproj">
       <Project>{D821AFB9-BCC9-4025-9A9C-798E2BC546AB}</Project>

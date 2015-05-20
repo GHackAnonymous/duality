@@ -9,11 +9,8 @@ using System.Diagnostics;
 
 using Duality;
 using Duality.Resources;
-using Duality.Animation;
 using Duality.Drawing;
 using Duality.Tests.Properties;
-
-using OpenTK;
 
 using NUnit.Framework;
 
@@ -257,7 +254,7 @@ namespace Duality.Tests.Drawing
 		{
 			Pixmap.Layer pixelData;
 
-			using (Texture texture = new Texture(width, height, Texture.SizeMode.NonPowerOfTwo))
+			using (Texture texture = new Texture(width, height, TextureSizeMode.NonPowerOfTwo))
 			using (RenderTarget renderTarget = new RenderTarget(AAQuality.Off, texture))
 			using (DrawDevice device = new DrawDevice())
 			{
@@ -267,16 +264,14 @@ namespace Duality.Tests.Drawing
 				device.Target = renderTarget;
 				device.ViewportRect = new Rect(renderTarget.Width, renderTarget.Height);
 
-				device.BeginRendering(ClearFlag.All, ColorRgba.TransparentBlack, 1.0f);
+				device.PrepareForDrawcalls();
 				{
 					Canvas canvas = new Canvas(device);
 					renderMethod(canvas);
 				}
-				device.EndRendering();
-				
-				RenderTarget.Bind(RenderTarget.None);
+				device.Render(ClearFlag.All, ColorRgba.TransparentBlack, 1.0f);
 
-				pixelData = texture.RetrievePixelData();
+				pixelData = texture.GetPixelData();
 			}
 
 			return pixelData;

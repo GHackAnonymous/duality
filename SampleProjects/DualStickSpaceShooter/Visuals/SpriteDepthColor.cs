@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using OpenTK;
-
 using Duality;
 using Duality.Drawing;
 using Duality.Components;
@@ -12,7 +10,6 @@ using Duality.Components.Renderers;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	[RequiredComponent(typeof(SpriteRenderer))]
 	public class SpriteDepthColor : Component, ICmpEditorUpdatable
 	{

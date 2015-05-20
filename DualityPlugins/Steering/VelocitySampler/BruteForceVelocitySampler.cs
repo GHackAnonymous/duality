@@ -1,5 +1,4 @@
 ﻿using Duality;
-using OpenTK;
 using System;
 using System.Collections.Generic;
 
@@ -9,12 +8,11 @@ namespace Duality.Plugins.Steering
 	/// Simple brute force implementation of <see cref="IVelocitySampler"/>. Velocities are equally distributed in all directions
 	/// independent of the costs which are fed back.
 	/// </summary>
-	[Serializable]
 	public class BruteForceVelocitySampler : IVelocitySampler
 	{
 		private int layerCount				= 3;
 		private int outerLayerSampleCount	= 128;
-		[NonSerialized] private int currentSampleIdx = 0;
+		[DontSerialize] private int currentSampleIdx = 0;
 
 		public void Reset()
 		{

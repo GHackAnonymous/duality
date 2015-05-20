@@ -10,6 +10,9 @@ using System.Diagnostics;
 
 using NuGet;
 
+using Duality.Editor.Properties;
+using Duality.Editor.Forms;
+
 namespace Duality.Editor.PackageManagement
 {
 	public sealed class PackageManager
@@ -21,6 +24,18 @@ namespace Duality.Editor.PackageManagement
 		public const string EditorTag	= "Editor";
 		public const string LauncherTag	= "Launcher";
 
+		/// <summary>
+		/// A list of package names that are considered "core" Duality packages.
+		/// If none of these show up anywhere in the deep dependency graph of a Duality package,
+		/// it will be assumed that dependencies are simply not specified properly.
+		/// </summary>
+		private readonly string[] DualityPackageNames = new string[] 
+		{
+			"AdamsLair.Duality",
+			"AdamsLair.Duality.Editor",
+			"AdamsLair.Duality.Launcher"
+		};
+
 		private const string UpdateConfigFile		= "ApplyUpdate.xml";
 		private const string PackageConfigFile		= "PackageConfig.xml";
 		private const string LocalPackageDir		= EditorHelper.SourceDirectory + @"\Packages";
@@ -28,6 +43,7 @@ namespace Duality.Editor.PackageManagement
 
 
 		private List<string>		repositoryUrls	= new List<string>{ DefaultRepositoryUrl };
+		private	bool				firstInstall	= false;
 		private	bool				hasLocalRepo	= false;
 		private	string				dataTargetDir	= null;
 		private	string				sourceTargetDir	= null;
@@ -38,10 +54,12 @@ namespace Duality.Editor.PackageManagement
 
 		private	object cacheLock = new object();
 		private	Dictionary<string,NuGet.IPackage[]> repositoryPackageCache = new Dictionary<string,NuGet.IPackage[]>();
+		private	Dictionary<NuGet.IPackage,bool> licenseAcceptedCache = new Dictionary<NuGet.IPackage,bool>();
 
 		private NuGet.PackageManager		manager		= null;
 		private	NuGet.IPackageRepository	repository	= null;
 
+		public event EventHandler<PackageLicenseAgreementEventArgs> PackageLicenseAcceptRequired = null;
 		public event EventHandler<PackageEventArgs> PackageInstalled = null;
 		public event EventHandler<PackageEventArgs> PackageUninstalled = null;
 
@@ -49,6 +67,10 @@ namespace Duality.Editor.PackageManagement
 		public IEnumerable<LocalPackage> LocalPackages
 		{
 			get { return this.localPackages; }
+		}
+		public bool IsFirstInstall
+		{
+			get { return this.firstInstall; }
 		}
 		public bool IsPackageUpdateRequired
 		{
@@ -105,10 +127,22 @@ namespace Duality.Editor.PackageManagement
 
 		public void InstallPackage(PackageInfo package)
 		{
+			this.InstallPackage(package, false);
+		}
+		private void InstallPackage(PackageInfo package, bool skipLicense)
+		{
+			NuGet.IPackage newPackage = this.FindPackageInfo(package.PackageName);
+
+			// Check license terms
+			if (!skipLicense && !this.CheckDeepLicenseAgreements(newPackage))
+			{
+				return;
+			}
+
 			// Request NuGet to install the package
-			NuGet.IPackage newPackage = this.FindPackageInfo(package.PackageName, false);
 			this.manager.InstallPackage(newPackage, false, false);
 		}
+
 		public void VerifyPackage(LocalPackage package)
 		{
 			Version oldPackageVersion = package.Version;
@@ -135,7 +169,7 @@ namespace Duality.Editor.PackageManagement
 
 			// Install the package. Won't do anything if the package is already installed.
 			this.manager.PackageInstalled += installListener;
-			this.InstallPackage(packageInfo);
+			this.InstallPackage(packageInfo, true);
 			this.manager.PackageInstalled -= installListener;
 
 			// If we didn't install anything, that package was already present in the local cache, but not in the PackageConfig file
@@ -184,36 +218,37 @@ namespace Duality.Editor.PackageManagement
 			return allowed;
 		}
 
-		public void UpdatePackage(PackageInfo package, Version specificVersion = null)
+		public void UpdatePackage(PackageInfo package)
 		{
-			this.UpdatePackage(this.localPackages.FirstOrDefault(p => p.Id == package.Id), specificVersion);
+			this.UpdatePackage(this.localPackages.FirstOrDefault(p => p.Id == package.Id));
 		}
-		public void UpdatePackage(LocalPackage package, Version specificVersion = null)
+		public void UpdatePackage(LocalPackage package)
 		{
-			// Due to a bug in NuGet 2.8.2, specific-version downgrades are limited to the package itself,
-			// without updating its dependencies. Otherwise, some of them might be uninstalled without
-			// being reinstalled properly.
+			NuGet.IPackage newPackage = this.FindPackageInfo(new PackageName(package.Id));
+			
+			// Check license terms
+			if (!this.CheckDeepLicenseAgreements(newPackage))
+			{
+				return;
+			}
 
 			this.uninstallQueue = null;
-			bool isDowngrade = specificVersion != null && specificVersion < package.Version;
-			NuGet.IPackage newPackage = this.FindPackageInfo(new PackageName(package.Id, specificVersion), false);
-			this.manager.UpdatePackage(newPackage, !isDowngrade, false);
+			this.manager.UpdatePackage(newPackage, true, false);
 			this.uninstallQueue = new List<LocalPackage>();
 		}
-		public bool CanUpdatePackage(PackageInfo package, Version specificVersion = null)
+		public bool CanUpdatePackage(PackageInfo package)
 		{
-			return this.CanUpdatePackage(this.localPackages.FirstOrDefault(p => p.Id == package.Id), specificVersion);
+			return this.CanUpdatePackage(this.localPackages.FirstOrDefault(p => p.Id == package.Id));
 		}
 		[DebuggerNonUserCode]
-		public bool CanUpdatePackage(LocalPackage package, Version specificVersion = null)
+		public bool CanUpdatePackage(LocalPackage package)
 		{
 			bool allowed = true;
 			this.manager.WhatIf = true;
 			try
 			{
-				bool isSpecific = specificVersion != null;
-				if (specificVersion == null) specificVersion = this.QueryPackageInfo(package.PackageName.VersionInvariant).Version;
-				this.manager.UpdatePackage(package.Id, new SemanticVersion(specificVersion), !isSpecific, false);
+				Version version = this.QueryPackageInfo(package.PackageName.VersionInvariant).Version;
+				this.manager.UpdatePackage(package.Id, new SemanticVersion(version), true, false);
 			}
 			catch (Exception)
 			{
@@ -224,66 +259,78 @@ namespace Duality.Editor.PackageManagement
 		}
 
 		/// <summary>
-		/// Determines whether all installed pacakges are forward compatible to <paramref name="target"/>.
+		/// Enumerates all target packages for local installs that could be updated.
+		/// </summary>
+		/// <returns></returns>
+		public IEnumerable<PackageInfo> GetUpdatablePackages()
+		{
+			List<PackageInfo> updatePackages = new List<PackageInfo>();
+			LocalPackage[] targetPackages = this.localPackages.ToArray();
+			for (int i = 0; i < targetPackages.Length; i++)
+			{
+				PackageInfo update = this.QueryPackageInfo(targetPackages[i].PackageName.VersionInvariant);
+				if (update.Version <= targetPackages[i].Version) continue;
+				updatePackages.Add(update);
+			}
+			return updatePackages;
+		}
+
+		/// <summary>
+		/// Determines compatibility between the current package installs and the specified target package.
+		/// Works for both updates and new installs.
 		/// </summary>
 		/// <param name="target"></param>
 		/// <returns></returns>
-		public PackageCompatibility GetForwardCompatibility(PackageInfo target)
+		public PackageCompatibility GetCompatibilityLevel(PackageInfo target)
 		{
-			LocalPackage current = this.localPackages.FirstOrDefault(p => p.Id == target.Id);
-			if (current == null)
+			// If the target package is already installed in the matching version, assume compatibility
+			if (this.localPackages.Any(local => local.Id == target.Id && local.Version == target.Version))
 				return PackageCompatibility.Definite;
 
-			Version currentVersion = current.Version;
-			Version targetVersion = target.Version;
+			// Determine all packages that might be updated or installed
+			PackageInfo[] touchedPackages = this.GetDeepDependencies(new[] { target }).ToArray();
 
-			// ToDo: Implement a more sophisticated algorithm
-
-			if (currentVersion.Major != targetVersion.Major)
-				return PackageCompatibility.Unlikely;
-			else if (currentVersion.Minor != targetVersion.Minor)
-				return PackageCompatibility.Likely;
-			else
-				return PackageCompatibility.Definite;
-		}
-		/// <summary>
-		/// Given the specified set of packages, this method returns a new set of the same packages where each version is the newest one
-		/// that can be safely updated to, given the specified minimum forward compatibility level. If a package cannot be updated at all,
-		/// it will be omitted in the resulting list.
-		/// </summary>
-		/// <param name="packages"></param>
-		/// <param name="minCompatibility"></param>
-		/// <returns></returns>
-		public IEnumerable<PackageInfo> GetSafeUpdateConfig(IEnumerable<PackageInfo> packages, PackageCompatibility minCompatibility)
-		{
-			List<PackageInfo> safeUpdateList = new List<PackageInfo>();
-			PackageInfo[] targetPackages = packages.ToArray();
-
-			for (int i = 0; i < targetPackages.Length; i++)
+			// Verify properly specified dependencies for Duality packages
+			if (target.IsDualityPackage)
 			{
-				PackageInfo package = targetPackages[i];
-				PackageInfo update = this.QueryPackageInfo(package.PackageName.VersionInvariant);
-				if (update.Version <= package.Version) continue;
-
-				// ToDo: Implement this
-
-				safeUpdateList.Add(update);
+				// If none of the targets deep dependencies is anyhow related to Duality, assume they're incomplete and potentially incompatible
+				bool anyDualityDependency = false;
+				foreach (PackageInfo package in touchedPackages)
+				{
+					if (DualityPackageNames.Any(name => string.Equals(name, package.Id)))
+					{
+						anyDualityDependency = true;
+						break;
+					}
+				}
+				if (!anyDualityDependency)
+					return PackageCompatibility.None;
 			}
 
-			return safeUpdateList;
-		}
-		/// <summary>
-		/// Given the specified set of packages, this method returns a new set of the same packages where each version is the newest one
-		/// that can be safely updated to, given the specified minimum forward compatibility level. If a package cannot be updated at all,
-		/// it will be omitted in the resulting list.
-		/// </summary>
-		/// <param name="packages"></param>
-		/// <param name="minCompatibility"></param>
-		/// <returns></returns>
-		public IEnumerable<PackageInfo> GetSafeUpdateConfig(IEnumerable<LocalPackage> packages, PackageCompatibility minCompatibility = PackageCompatibility.Likely)
-		{
-			var localInfo = packages.Select(p => p.Info ?? this.QueryPackageInfo(p.PackageName)).ToArray();
-			return this.GetSafeUpdateConfig(localInfo, minCompatibility);
+			// Generate a mapping to already installed packages
+			Dictionary<PackageInfo,LocalPackage> localMap = new Dictionary<PackageInfo,LocalPackage>();
+			foreach (PackageInfo package in touchedPackages)
+			{
+				LocalPackage local = this.localPackages.FirstOrDefault(p => p.Id == package.Id);
+				if (local == null) continue;
+
+				localMap.Add(package, local);
+			}
+
+			// Determine the maximum version difference between target and installed
+			PackageCompatibility compatibility = PackageCompatibility.Definite;
+			foreach (var pair in localMap)
+			{
+				Version targetVersion = pair.Key.Version;
+				Version localVersion = pair.Value.Version;
+				
+				if (localVersion.Major != targetVersion.Major)
+					compatibility = compatibility.Combine(PackageCompatibility.Unlikely);
+				else if (localVersion.Minor != targetVersion.Minor)
+					compatibility = compatibility.Combine(PackageCompatibility.Likely);
+			}
+
+			return compatibility;
 		}
 
 		/// <summary>
@@ -321,7 +368,11 @@ namespace Duality.Editor.PackageManagement
 			for (int i = 0; i < originalPackages.Length; i++)
 			{
 				LocalPackage localPackage = originalPackages[i];
+
 				int newIndex = localInfo.IndexOfFirst(p => p.Id == localPackage.Id && p.Version == localPackage.Version);
+				if (newIndex == -1)
+					newIndex = localInfo.IndexOfFirst(p => p.Id == localPackage.Id);
+
 				packages[newIndex] = localPackage;
 			}
 		}
@@ -367,6 +418,16 @@ namespace Duality.Editor.PackageManagement
 			return true;
 		}
 		
+		/// <summary>
+		/// Enumerates the complete dependency tree of the specified packages.
+		/// </summary>
+		/// <param name="package"></param>
+		/// <returns></returns>
+		private IEnumerable<PackageInfo> GetDeepDependencies(IEnumerable<PackageInfo> packages)
+		{
+			Dictionary<PackageInfo,int> deepDependencyCount = this.GetDeepDependencyCount(packages);
+			return deepDependencyCount.Keys;
+		}
 		/// <summary>
 		/// Determines the number of deep dependencies for each package in the specified collection.
 		/// </summary>
@@ -496,18 +557,14 @@ namespace Duality.Editor.PackageManagement
 		}
 		public PackageInfo QueryPackageInfo(PackageName packageRef)
 		{
-			return this.QueryPackageInfo(packageRef, false);
-		}
-		private PackageInfo QueryPackageInfo(PackageName packageRef, bool findMaxVersionBelow)
-		{
-			NuGet.IPackage package = this.FindPackageInfo(packageRef, findMaxVersionBelow);
+			NuGet.IPackage package = this.FindPackageInfo(packageRef);
 			return package != null ? this.CreatePackageInfo(package) : null;
 		}
 		
-		private NuGet.IPackage FindPackageInfo(PackageName packageRef, bool findMaxVersionBelow)
+		private NuGet.IPackage FindPackageInfo(PackageName packageRef)
 		{
 			// Find a direct version match
-			if (packageRef.Version != null && !findMaxVersionBelow)
+			if (packageRef.Version != null)
 			{
 				// Query locally first, since we're looking for a specific version number anyway.
 				foreach (NuGet.IPackage package in this.manager.LocalRepository.FindPackagesById(packageRef.Id))
@@ -545,8 +602,6 @@ namespace Duality.Editor.PackageManagement
 				}
 
 				var packageQuery = data.Where(p => p.IsListed() && p.IsReleaseVersion());
-				if (findMaxVersionBelow && packageRef.Version != null)
-					packageQuery = packageQuery.Where(p => p.Version.Version < packageRef.Version);
 
 				NuGet.IPackage newestPackage = packageQuery
 					.OrderByDescending(p => p.Version.Version)
@@ -617,6 +672,57 @@ namespace Duality.Editor.PackageManagement
 			return PackageRepositoryFactory.Default.CreateRepository(repositoryUrl);
 		}
 
+		private bool CheckDeepLicenseAgreements(NuGet.IPackage package)
+		{
+			var deepDependencyCountDict = this.GetDeepDependencyCount(new[] { this.CreatePackageInfo(package) });
+			NuGet.IPackage[] deepPackages = deepDependencyCountDict.Keys.Select(i => this.FindPackageInfo(i.PackageName.VersionInvariant)).ToArray();
+
+			foreach (NuGet.IPackage p in deepPackages)
+			{
+				// Skip the ones that are already installed
+				if (this.manager.LocalRepository.GetPackages().Any(l => l.Id == p.Id && l.Version == p.Version))
+					continue;
+
+				if (!this.CheckLicenseAgreement(p))
+					return false;
+			}
+
+			return true;
+		}
+		private bool CheckLicenseAgreement(NuGet.IPackage package)
+		{
+			if (package.RequireLicenseAcceptance)
+			{
+				// On the very first install, do not display additional license agreement dialogs
+				// because all the packages being installed are the default ones.
+				if (this.firstInstall)
+					return true;
+
+				bool agreed;
+				if (!this.licenseAcceptedCache.TryGetValue(package, out agreed) || !agreed)
+				{
+					PackageLicenseAgreementEventArgs args = new PackageLicenseAgreementEventArgs(
+						new PackageName(package.Id, package.Version.Version),
+						package.LicenseUrl,
+						package.RequireLicenseAcceptance);
+
+					if (this.PackageLicenseAcceptRequired != null)
+						this.PackageLicenseAcceptRequired(this, args);
+					else
+						DisplayDefaultLicenseAcceptDialog(args);
+
+					agreed = args.IsLicenseAccepted;
+					this.licenseAcceptedCache[package] = agreed;
+				}
+
+				if (!agreed)
+				{ 
+					return false;
+				}
+			}
+
+			return true;
+		}
 		private void LoadConfig()
 		{
 			// Reset to default data
@@ -634,6 +740,11 @@ namespace Duality.Editor.PackageManagement
 			try
 			{
 				XDocument doc = XDocument.Load(configFilePath);
+
+				string firstInstallString = doc.Root.GetElementValue("FirstDualityInstall");
+				bool firstInstallValue;
+				if (!string.IsNullOrWhiteSpace(firstInstallString) && bool.TryParse(firstInstallString, out firstInstallValue))
+					this.firstInstall = firstInstallValue;
 
 				this.repositoryUrls.Clear();
 				this.repositoryUrls.AddRange(doc.Root.Elements("RepositoryUrl").Select(x => x.Value));
@@ -836,7 +947,9 @@ namespace Duality.Editor.PackageManagement
 			info.Summary		= package.Summary;
 			info.Description	= package.Description;
 			info.ReleaseNotes	= package.ReleaseNotes;
+			info.RequireLicenseAcceptance = package.RequireLicenseAcceptance;
 			info.ProjectUrl		= package.ProjectUrl;
+			info.LicenseUrl		= package.LicenseUrl;
 			info.IconUrl		= package.IconUrl;
 			info.DownloadCount	= package.DownloadCount;
 			info.PublishDate	= package.Published.HasValue ? package.Published.Value.DateTime : DateTime.MinValue;
@@ -960,6 +1073,21 @@ namespace Duality.Editor.PackageManagement
 			this.OnPackageInstalled(new PackageEventArgs(new PackageName(e.Package.Id, e.Package.Version.Version)));
 		}
 
+		private static void DisplayDefaultLicenseAcceptDialog(PackageLicenseAgreementEventArgs args)
+		{
+			LicenseAcceptDialog licenseDialog = new LicenseAcceptDialog
+			{
+				DescriptionText = string.Format(GeneralRes.LicenseAcceptDialog_PackageDesc, args.PackageName),
+				LicenseUrl = args.LicenseUrl
+			};
+
+			Form invokeForm = DualityEditorApp.MainForm ?? Application.OpenForms.OfType<Form>().FirstOrDefault();
+			DialogResult result = invokeForm.InvokeEx(main => licenseDialog.ShowDialog());
+			if (result == DialogResult.OK)
+			{
+				args.AcceptLicense();
+			}
+		}
 		public static string GetDisplayedVersion(Version version)
 		{
 			if (version == null)

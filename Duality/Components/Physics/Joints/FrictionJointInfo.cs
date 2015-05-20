@@ -1,7 +1,5 @@
 ﻿using System;
 
-using OpenTK;
-
 using FarseerPhysics.Dynamics;
 using FarseerPhysics.Factories;
 using FarseerPhysics.Dynamics.Joints;
@@ -14,7 +12,6 @@ namespace Duality.Components.Physics
 	/// <summary>
 	/// Applies relative friction to RigidBodies.
 	/// </summary>
-	[Serializable]
 	public sealed class FrictionJointInfo : JointInfo
 	{
 		private	Vector2	localAnchorA	= Vector2.Zero;

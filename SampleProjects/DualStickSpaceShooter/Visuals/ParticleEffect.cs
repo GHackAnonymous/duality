@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK;
-
 using Duality;
 using Duality.Editor;
 using Duality.Resources;
@@ -13,7 +11,6 @@ using Duality.Drawing;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	[RequiredComponent(typeof(Transform))]
 	public class ParticleEffect : Renderer, ICmpUpdatable, ICmpInitializable
 	{
@@ -28,11 +25,11 @@ namespace DualStickSpaceShooter
 		private bool					disposeWhenEmpty	= true;
 		private	List<ParticleEmitter>	emitters			= new List<ParticleEmitter>();
 
-		[NonSerialized]
+		[DontSerialize]
 		private float					boundRadius			= 0.0f;
-		[NonSerialized]
+		[DontSerialize]
 		private RawList<Particle>		particles			= null;
-		[NonSerialized]
+		[DontSerialize]
 		private RawList<VertexC1P3T2>	vertexBuffer		= null;
 
 		
@@ -235,20 +232,20 @@ namespace DualStickSpaceShooter
 				vertexData[vertexBaseIndex + 1].Pos.Y = particlePos.Y + edgeBottomLeft.Y;
 				vertexData[vertexBaseIndex + 1].Pos.Z = particlePos.Z;
 				vertexData[vertexBaseIndex + 1].TexCoord.X = uvRect.X;
-				vertexData[vertexBaseIndex + 1].TexCoord.Y = uvRect.MaximumY;
+				vertexData[vertexBaseIndex + 1].TexCoord.Y = uvRect.MaxY;
 				vertexData[vertexBaseIndex + 1].Color = color;
 
 				vertexData[vertexBaseIndex + 2].Pos.X = particlePos.X + edgeBottomRight.X;
 				vertexData[vertexBaseIndex + 2].Pos.Y = particlePos.Y + edgeBottomRight.Y;
 				vertexData[vertexBaseIndex + 2].Pos.Z = particlePos.Z;
-				vertexData[vertexBaseIndex + 2].TexCoord.X = uvRect.MaximumX;
-				vertexData[vertexBaseIndex + 2].TexCoord.Y = uvRect.MaximumY;
+				vertexData[vertexBaseIndex + 2].TexCoord.X = uvRect.MaxX;
+				vertexData[vertexBaseIndex + 2].TexCoord.Y = uvRect.MaxY;
 				vertexData[vertexBaseIndex + 2].Color = color;
 				
 				vertexData[vertexBaseIndex + 3].Pos.X = particlePos.X + edgeTopRight.X;
 				vertexData[vertexBaseIndex + 3].Pos.Y = particlePos.Y + edgeTopRight.Y;
 				vertexData[vertexBaseIndex + 3].Pos.Z = particlePos.Z;
-				vertexData[vertexBaseIndex + 3].TexCoord.X = uvRect.MaximumX;
+				vertexData[vertexBaseIndex + 3].TexCoord.X = uvRect.MaxX;
 				vertexData[vertexBaseIndex + 3].TexCoord.Y = uvRect.Y;
 				vertexData[vertexBaseIndex + 3].Color = color;
 			}

@@ -9,16 +9,11 @@ using Duality.Cloning;
 using Duality.Components.Physics;
 using Duality.Properties;
 
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
-using OpenTK.Input;
-
 namespace Duality.Components.Renderers
 {
 	/// <summary>
 	/// A <see cref="Duality.Component"/> that renders a RigidBodies shape and outline.
 	/// </summary>
-	[Serializable]
 	[RequiredComponent(typeof(RigidBody))]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageRigidBodyRenderer)]
@@ -34,7 +29,7 @@ namespace Duality.Components.Renderers
 		private	bool					fillHollowShapes		= false;
 		private	bool					wrapTexture				= true;
 
-		[NonSerialized] private	CanvasBuffer	vertexBuffer	= new CanvasBuffer();
+		[DontSerialize] private	CanvasBuffer	vertexBuffer	= new CanvasBuffer();
 
 
 		public override float BoundRadius
@@ -58,7 +53,7 @@ namespace Duality.Components.Renderers
 			set { this.outlineMaterial = value; }
 		}
 		/// <summary>
-		/// [GET / SET] A custom, local <see cref="Duality.Resources.BatchInfo"/> overriding the <see cref="AreaMaterial"/>.
+		/// [GET / SET] A custom, local <see cref="Duality.Drawing.BatchInfo"/> overriding the <see cref="AreaMaterial"/>.
 		/// </summary>
 		public BatchInfo CustomAreaMaterial
 		{
@@ -66,7 +61,7 @@ namespace Duality.Components.Renderers
 			set { this.customAreaMaterial = value; }
 		}
 		/// <summary>
-		/// [GET / SET] A custom, local <see cref="Duality.Resources.BatchInfo"/> overriding the <see cref="OutlineMaterial"/>.
+		/// [GET / SET] A custom, local <see cref="Duality.Drawing.BatchInfo"/> overriding the <see cref="OutlineMaterial"/>.
 		/// </summary>
 		public BatchInfo CustomOutlineMaterial
 		{

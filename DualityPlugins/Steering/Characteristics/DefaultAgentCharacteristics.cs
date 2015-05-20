@@ -3,7 +3,6 @@
 using Duality;
 using Duality.Editor;
 
-using OpenTK;
 
 namespace Duality.Plugins.Steering
 {
@@ -13,13 +12,12 @@ namespace Duality.Plugins.Steering
 	/// hide implementation details as much as possible. If you need more control you can
 	/// either use <see cref="AdvancedAgentCharacteristics"/> or use a custom implementation.
 	/// </summary>
-	[Serializable]
 	public class DefaultAgentCharacteristics : IAgentCharacteristics
 	{
 		private float aggressiveness = 0.5f;
 
-		[NonSerialized] private AdvancedAgentCharacteristics baseImpl = new AdvancedAgentCharacteristics();
-		[NonSerialized] private bool updateBaseImplParams = true;
+		[DontSerialize] private AdvancedAgentCharacteristics baseImpl = new AdvancedAgentCharacteristics();
+		[DontSerialize] private bool updateBaseImplParams = true;
 
 
 		public float MaxSpeed

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using OpenTK;
-
 using Duality;
 using Duality.Editor;
 using Duality.Resources;
@@ -14,7 +12,6 @@ using Duality.Components.Renderers;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	public class ShipBlueprint : Resource
 	{
 		private	float						thrusterPower			= 0.0f;

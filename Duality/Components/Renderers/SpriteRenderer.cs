@@ -6,15 +6,11 @@ using Duality.Editor;
 using Duality.Properties;
 using Duality.Cloning;
 
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
-
 namespace Duality.Components.Renderers
 {
 	/// <summary>
 	/// Renders a sprite to represent the <see cref="GameObject"/>.
 	/// </summary>
-	[Serializable]
 	[ManuallyCloned]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageSpriteRenderer)]
@@ -53,7 +49,7 @@ namespace Duality.Components.Renderers
 		protected	UVMode					rectMode	= UVMode.Stretch;
 		protected	bool					pixelGrid	= false;
 		protected	int						offset		= 0;
-		[NonSerialized] protected	VertexC1P3T2[]	vertices	= null;
+		[DontSerialize] protected	VertexC1P3T2[]	vertices	= null;
 
 		[EditorHintFlags(MemberFlags.Invisible)]
 		public override float BoundRadius
@@ -78,7 +74,7 @@ namespace Duality.Components.Renderers
 			set { this.sharedMat = value; }
 		}
 		/// <summary>
-		/// [GET / SET] A custom, local <see cref="Duality.Resources.BatchInfo"/> overriding the <see cref="SharedMaterial"/>,
+		/// [GET / SET] A custom, local <see cref="Duality.Drawing.BatchInfo"/> overriding the <see cref="SharedMaterial"/>,
 		/// allowing this sprite to look unique without having to create its own <see cref="Duality.Resources.Material"/> Resource.
 		/// However, this feature should be used with caution: Performance is better using <see cref="SharedMaterial">shared Materials</see>.
 		/// </summary>
@@ -197,20 +193,20 @@ namespace Duality.Components.Renderers
 			vertices[1].Pos.Y = posTemp.Y + edge2.Y;
 			vertices[1].Pos.Z = posTemp.Z + this.VertexZOffset;
 			vertices[1].TexCoord.X = uvRect.X;
-			vertices[1].TexCoord.Y = uvRect.MaximumY;
+			vertices[1].TexCoord.Y = uvRect.MaxY;
 			vertices[1].Color = mainClr;
 
 			vertices[2].Pos.X = posTemp.X + edge3.X;
 			vertices[2].Pos.Y = posTemp.Y + edge3.Y;
 			vertices[2].Pos.Z = posTemp.Z + this.VertexZOffset;
-			vertices[2].TexCoord.X = uvRect.MaximumX;
-			vertices[2].TexCoord.Y = uvRect.MaximumY;
+			vertices[2].TexCoord.X = uvRect.MaxX;
+			vertices[2].TexCoord.Y = uvRect.MaxY;
 			vertices[2].Color = mainClr;
 				
 			vertices[3].Pos.X = posTemp.X + edge4.X;
 			vertices[3].Pos.Y = posTemp.Y + edge4.Y;
 			vertices[3].Pos.Z = posTemp.Z + this.VertexZOffset;
-			vertices[3].TexCoord.X = uvRect.MaximumX;
+			vertices[3].TexCoord.X = uvRect.MaxX;
 			vertices[3].TexCoord.Y = uvRect.Y;
 			vertices[3].Color = mainClr;
 			

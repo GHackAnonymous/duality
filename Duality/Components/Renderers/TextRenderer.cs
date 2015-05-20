@@ -7,15 +7,11 @@ using Duality.Resources;
 using Duality.Editor;
 using Duality.Properties;
 
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
-
 namespace Duality.Components.Renderers
 {
 	/// <summary>
 	/// Renders a text to represent the <see cref="GameObject"/>.
 	/// </summary>
-	[Serializable]
 	[ManuallyCloned]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageFont)]
@@ -25,10 +21,10 @@ namespace Duality.Components.Renderers
 		protected	FormattedText			text		= new FormattedText("Hello World");
 		protected	BatchInfo				customMat	= null;
 		protected	ColorRgba				colorTint	= ColorRgba.White;
-		protected	ContentRef<Material>	iconMat		= ContentRef<Material>.Null;
+		protected	ContentRef<Material>	iconMat		= null;
 		protected	int						offset		= 0;
-		[NonSerialized] protected	VertexC1P3T2[][]	vertFont	= null;
-		[NonSerialized] protected	VertexC1P3T2[]		vertIcon	= null;
+		[DontSerialize] protected	VertexC1P3T2[][]	vertFont	= null;
+		[DontSerialize] protected	VertexC1P3T2[]		vertIcon	= null;
 
 
 		[EditorHintFlags(MemberFlags.Invisible)]
@@ -84,7 +80,7 @@ namespace Duality.Components.Renderers
 			get { return this.text.TextMetrics; }
 		}
 		/// <summary>
-		/// [GET / SET] A custom, local <see cref="Duality.Resources.BatchInfo"/> overriding the texts own <see cref="Duality.Resources.Font.Material">
+		/// [GET / SET] A custom, local <see cref="Duality.Drawing.BatchInfo"/> overriding the texts own <see cref="Duality.Resources.Font.Material">
 		/// Materials</see>. Note that it does not override each <see cref="Duality.Resources.Font">Fonts</see> Texture, but their DrawTechniques and
 		/// main colors.
 		/// </summary>
@@ -142,72 +138,6 @@ namespace Duality.Components.Renderers
 					posTemp.X += 0.5f;
 				if (MathF.RoundToInt(device.TargetSize.Y) != (MathF.RoundToInt(device.TargetSize.Y) / 2) * 2)
 					posTemp.Y += 0.5f;
-			}
-
-			// Draw design time metrics data
-			if (DualityApp.ExecContext == DualityApp.ExecutionContext.Editor)
-			{
-				bool showLimits		= true;
-				bool showLines		= false;
-				bool showElements	= false;
-				Vector3 metricsOffset = new Vector3(0.0f, 0.0f, 0.01f);
-				Vector3 lineOffset = new Vector3(0.5f, 0.5f, 0.0f);
-				Vector3 tUnitX = Vector3.UnitX;
-				Vector3 tUnitY = Vector3.UnitY;
-				MathF.TransformDotVec(ref tUnitX, ref xDot, ref yDot);
-				MathF.TransformDotVec(ref tUnitY, ref xDot, ref yDot);
-
-				// Actual text size and maximum text size
-				if (showLimits)
-				{
-					Vector3 textWidth = tUnitX * this.text.Size.X;
-					Vector3 textHeight = tUnitY * this.text.Size.Y;
-					Vector3 textMaxWidth = tUnitX * this.text.MaxWidth;
-					Vector3 textMaxHeight = tUnitY * MathF.Max(this.text.MaxHeight, this.text.Size.Y);
-
-					ColorRgba clrSize = ColorRgba.Green.WithAlpha(128);
-					ColorRgba clrMaxSize = ColorRgba.Red.WithAlpha(128);
-					device.AddVertices(new BatchInfo(DrawTechnique.Alpha, ColorRgba.White), VertexMode.LineLoop,
-						new VertexC1P3(metricsOffset + lineOffset + posTemp, clrSize),
-						new VertexC1P3(metricsOffset + lineOffset + posTemp + textWidth, clrSize),
-						new VertexC1P3(metricsOffset + lineOffset + posTemp + textWidth + textHeight, clrSize),
-						new VertexC1P3(metricsOffset + lineOffset + posTemp + textHeight, clrSize));
-					device.AddVertices(new BatchInfo(DrawTechnique.Alpha, ColorRgba.White), VertexMode.LineLoop,
-						new VertexC1P3(metricsOffset + lineOffset + posTemp, clrMaxSize),
-						new VertexC1P3(metricsOffset + lineOffset + posTemp + textMaxWidth, clrMaxSize),
-						new VertexC1P3(metricsOffset + lineOffset + posTemp + textMaxWidth + textMaxHeight, clrMaxSize),
-						new VertexC1P3(metricsOffset + lineOffset + posTemp + textMaxHeight, clrMaxSize));
-				}
-
-				// Individual line sizes
-				if (showLines)
-				{
-					ColorRgba clrLineBg = (ColorRgba.Blue + ColorRgba.Red).WithAlpha(64);
-					for (int i = 0; i < this.text.TextMetrics.LineBounds.Count; i++)
-					{
-						Rect lineRect = this.text.TextMetrics.LineBounds[i];
-						device.AddVertices(new BatchInfo(DrawTechnique.Alpha, ColorRgba.White), VertexMode.Quads,
-							new VertexC1P3(metricsOffset + posTemp + lineRect.TopLeft.X * tUnitX + lineRect.TopLeft.Y * tUnitY, clrLineBg),
-							new VertexC1P3(metricsOffset + posTemp + lineRect.BottomLeft.X * tUnitX + lineRect.BottomLeft.Y * tUnitY, clrLineBg),
-							new VertexC1P3(metricsOffset + posTemp + lineRect.BottomRight.X * tUnitX + lineRect.BottomRight.Y * tUnitY, clrLineBg),
-							new VertexC1P3(metricsOffset + posTemp + lineRect.TopRight.X * tUnitX + lineRect.TopRight.Y * tUnitY, clrLineBg));
-					}
-				}
-
-				// Individual line sizes
-				if (showElements)
-				{
-					ColorRgba clrElementBg = (ColorRgba.Blue + ColorRgba.Green).WithAlpha(128);
-					for (int i = 0; i < this.text.TextMetrics.ElementBounds.Count; i++)
-					{
-						Rect elemRect = this.text.TextMetrics.ElementBounds[i];
-						device.AddVertices(new BatchInfo(DrawTechnique.Alpha, ColorRgba.White), VertexMode.LineLoop,
-							new VertexC1P3(metricsOffset + lineOffset + posTemp + elemRect.TopLeft.X * tUnitX + elemRect.TopLeft.Y * tUnitY, clrElementBg),
-							new VertexC1P3(metricsOffset + lineOffset + posTemp + elemRect.BottomLeft.X * tUnitX + elemRect.BottomLeft.Y * tUnitY, clrElementBg),
-							new VertexC1P3(metricsOffset + lineOffset + posTemp + elemRect.BottomRight.X * tUnitX + elemRect.BottomRight.Y * tUnitY, clrElementBg),
-							new VertexC1P3(metricsOffset + lineOffset + posTemp + elemRect.TopRight.X * tUnitX + elemRect.TopRight.Y * tUnitY, clrElementBg));
-					}
-				}
 			}
 
 			ColorRgba matColor = this.customMat != null ? this.customMat.MainColor : ColorRgba.White;

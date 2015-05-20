@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Diagnostics;
 using System.Xml.Linq;
 using System.Windows.Forms;
@@ -190,6 +191,7 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 
 			this.packageList.DefaultToolTipProvider = this;
 			this.packageList.ShowNodeToolTips = true;
+			this.packageList.NodeFilter = this.PackageListNodeFilter;
 
 			this.treeColumnName.DrawColHeaderBg			+= this.treeColumn_DrawColHeaderBg;
 			this.treeColumnVersion.DrawColHeaderBg		+= this.treeColumn_DrawColHeaderBg;
@@ -201,7 +203,6 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 
 			this.toolStripViewBox.Items.Add(new FilterBoxItem(DisplayMode.Installed, PackageManagerFrontendRes.ItemName_InstalledPackages));
 			this.toolStripViewBox.Items.Add(new FilterBoxItem(DisplayMode.Online, PackageManagerFrontendRes.ItemName_OnlineRepository));
-			
 		}
 
 		internal void SaveUserData(XElement node) {}
@@ -251,19 +252,37 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 				this.labelPackageVersion.Text		= null;
 				this.labelPackageUpdated.Text		= null;
 				this.labelPackageWebsite.Text		= null;
+				this.labelPackageLicense.Text		= null;
+				this.textBoxReleaseNotes.Text		= null;
 			}
 			else
 			{
 				bool isItemInstalled = installedInfo != null;
 				bool isItemUpdatable = isItemInstalled && newestInfo != null && installedInfo.Version < newestInfo.Version;
 
+				string releaseNoteText = (isItemUpdatable && !string.IsNullOrWhiteSpace(newestInfo.ReleaseNotes)) ? newestInfo.ReleaseNotes : string.Empty;
+				if (!string.IsNullOrWhiteSpace(releaseNoteText))
+					releaseNoteText = Regex.Replace(releaseNoteText, @"\r\n?|\n", Environment.NewLine);
+
+				string websiteLinkCaption = itemInfo.ProjectUrl != null ? itemInfo.ProjectUrl.Host : string.Empty;
+				string licenseLinkCaption = itemInfo.LicenseUrl != null ? itemInfo.LicenseUrl.Host : string.Empty;
+
+				if (!string.IsNullOrWhiteSpace(websiteLinkCaption))
+					websiteLinkCaption = string.Format(PackageManagerFrontendRes.ItemName_VisitLinkUrl, websiteLinkCaption);
+				if (!string.IsNullOrWhiteSpace(licenseLinkCaption))
+					licenseLinkCaption = string.Format(PackageManagerFrontendRes.ItemName_VisitLinkUrl, licenseLinkCaption);
+
 				this.labelPackageTitle.Text			= !string.IsNullOrWhiteSpace(itemInfo.Title) ? itemInfo.Title : itemInfo.Id;
 				this.labelPackageId.Text			= itemInfo.Id;
-				this.labelPackageDesc.Text			= (isItemUpdatable && !string.IsNullOrWhiteSpace(newestInfo.ReleaseNotes)) ? newestInfo.ReleaseNotes : itemInfo.Description;
+				this.labelPackageDesc.Text			= itemInfo.Description;
 				this.labelPackageAuthor.Text		= itemInfo.Authors.ToString(", ");
 				this.labelPackageTags.Text			= itemInfo.Tags.Except(InvisibleTags).ToString(", ");
 				this.labelPackageUpdated.Text		= itemInfo.PublishDate.ToString("yyyy-MM-dd, HH:mm", System.Globalization.CultureInfo.InvariantCulture);
-				this.labelPackageWebsite.Text		= itemInfo.ProjectUrl != null ? itemInfo.ProjectUrl.ToString() : string.Empty;
+				this.labelPackageWebsite.Text		= websiteLinkCaption;
+				this.labelPackageWebsite.Tag		= itemInfo.ProjectUrl;
+				this.labelPackageLicense.Text		= licenseLinkCaption;
+				this.labelPackageLicense.Tag		= itemInfo.LicenseUrl;
+				this.textBoxReleaseNotes.Text		= releaseNoteText;
 				this.labelPackageVersion.Text		= isItemUpdatable ? 
 					string.Format("{0} --> {1}", 
 						PackageManager.GetDisplayedVersion(installedInfo.Version), 
@@ -276,44 +295,94 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 			this.labelPackageVersion.Visible		= !string.IsNullOrWhiteSpace(this.labelPackageVersion.Text);
 			this.labelPackageUpdated.Visible		= !string.IsNullOrWhiteSpace(this.labelPackageUpdated.Text);
 			this.labelPackageWebsite.Visible		= !string.IsNullOrWhiteSpace(this.labelPackageWebsite.Text);
+			this.labelPackageLicense.Visible		= !string.IsNullOrWhiteSpace(this.labelPackageLicense.Text);
+			this.textBoxReleaseNotes.Visible		= !string.IsNullOrWhiteSpace(this.textBoxReleaseNotes.Text);
 
 			this.labelPackageAuthorCaption.Visible	= this.labelPackageAuthor.Visible;
 			this.labelPackageTagsCaption.Visible	= this.labelPackageTags.Visible;
 			this.labelPackageVersionCaption.Visible	= this.labelPackageVersion.Visible;
 			this.labelPackageUpdatedCaption.Visible	= this.labelPackageUpdated.Visible;
 			this.labelPackageWebsiteCaption.Visible	= this.labelPackageWebsite.Visible;
+			this.labelPackageLicenseCaption.Visible	= this.labelPackageLicense.Visible;
+			this.labelReleaseNotesCaption.Visible	= this.textBoxReleaseNotes.Visible;
 
 			this.ResumeLayout();
 		}
 
 		private void InstallPackage(PackageInfo info)
 		{
-			ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
-				PackageManagerFrontendRes.TaskInstallPackages_Caption, 
-				PackageManagerFrontendRes.TaskInstallPackages_Desc, 
-				PackageOperationThread, 
-				new PackageOperationData(this.packageManager, info, d => d.Manager.InstallPackage(d.Package)));
-			setupDialog.MainThreadRequired = false;
-			setupDialog.ShowDialog();
-			this.modelInstalled.ApplyChanges();
-			this.restartRequired = (setupDialog.DialogResult == DialogResult.OK);
-			this.UpdateBottomButtons();
+			if (!this.ConfirmCompatibility(info))
+				return;
+
+			bool anythingChanged = false;
+			EventHandler<PackageEventArgs> listener = delegate (object sender, PackageEventArgs e)
+			{
+				anythingChanged = true;
+			};
+
+			bool operationSuccessful = false;
+			this.packageManager.PackageInstalled += listener;
+			this.packageManager.PackageUninstalled += listener;
+			{ 
+				ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
+					PackageManagerFrontendRes.TaskInstallPackages_Caption, 
+					PackageManagerFrontendRes.TaskInstallPackages_Desc, 
+					PackageOperationThread, 
+					new PackageOperationData(this.packageManager, info, d => d.Manager.InstallPackage(d.Package)));
+				setupDialog.MainThreadRequired = false;
+				setupDialog.ShowDialog();
+				operationSuccessful = setupDialog.DialogResult == DialogResult.OK;
+			}
+			this.packageManager.PackageUninstalled -= listener;
+			this.packageManager.PackageInstalled -= listener;
+
+			if (anythingChanged)
+			{
+				this.packageList.Invalidate();
+				this.modelInstalled.ApplyChanges();
+				this.modelOnline.ApplyChanges();
+				this.restartRequired = operationSuccessful;
+				this.UpdateBottomButtons();
+			}
 		}
 		private void UninstallPackage(PackageInfo info)
 		{
-			ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
-				PackageManagerFrontendRes.TaskUninstallPackages_Caption, 
-				PackageManagerFrontendRes.TaskUninstallPackages_Desc, 
-				PackageOperationThread, 
-				new PackageOperationData(this.packageManager, info, d => d.Manager.UninstallPackage(d.Package)));
-			setupDialog.MainThreadRequired = false;
-			setupDialog.ShowDialog();
-			this.modelInstalled.ApplyChanges();
-			this.restartRequired = (setupDialog.DialogResult == DialogResult.OK);
-			this.UpdateBottomButtons();
+			bool anythingChanged = false;
+			EventHandler<PackageEventArgs> listener = delegate (object sender, PackageEventArgs e)
+			{
+				anythingChanged = true;
+			};
+
+			bool operationSuccessful = false;
+			this.packageManager.PackageInstalled += listener;
+			this.packageManager.PackageUninstalled += listener;
+			{
+				ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
+					PackageManagerFrontendRes.TaskUninstallPackages_Caption, 
+					PackageManagerFrontendRes.TaskUninstallPackages_Desc, 
+					PackageOperationThread, 
+					new PackageOperationData(this.packageManager, info, d => d.Manager.UninstallPackage(d.Package)));
+				setupDialog.MainThreadRequired = false;
+				setupDialog.ShowDialog();
+				operationSuccessful = setupDialog.DialogResult == DialogResult.OK;
+			}
+			this.packageManager.PackageUninstalled -= listener;
+			this.packageManager.PackageInstalled -= listener;
+			
+			if (anythingChanged)
+			{
+				this.packageList.Invalidate();
+				this.modelInstalled.ApplyChanges();
+				this.modelOnline.ApplyChanges();
+				this.restartRequired = operationSuccessful;
+				this.UpdateBottomButtons();
+			}
 		}
 		private void UpdatePackage(PackageInfo info)
 		{
+			if (!this.ConfirmCompatibility(info))
+				return;
+
 			ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
 				PackageManagerFrontendRes.TaskUpdatePackages_Caption, 
 				PackageManagerFrontendRes.TaskUpdatePackages_Desc, 
@@ -321,64 +390,18 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 				new PackageOperationData(this.packageManager, info, d => d.Manager.UpdatePackage(d.Package)));
 			setupDialog.MainThreadRequired = false;
 			setupDialog.ShowDialog();
+
+			this.packageList.Invalidate();
 			this.modelInstalled.ApplyChanges();
+			this.modelOnline.ApplyChanges();
 			this.restartRequired = (setupDialog.DialogResult == DialogResult.OK);
-			this.UpdateBottomButtons();
-		}
-		private void UpdatePackage(PackageInfo info, Version specificVersion)
-		{
-			bool success = false;
-			bool cantUpdate = false;
-			bool packageNotFound = false;
-			ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
-				PackageManagerFrontendRes.TaskUpdatePackages_Caption, 
-				PackageManagerFrontendRes.TaskUpdatePackages_Desc, 
-				PackageOperationThread, 
-				new PackageOperationData(this.packageManager, info, d => 
-				{
-					PackageInfo targetPackage = d.Manager.QueryPackageInfo(new PackageName(d.Package.Id, specificVersion));
-					if (targetPackage == null)
-					{
-						packageNotFound = true;
-						return;
-					}
-					if (d.Package.Version == specificVersion) return;
-					if (!d.Manager.CanUpdatePackage(d.Package, specificVersion))
-					{
-						cantUpdate = true;
-						return;
-					}
-
-					d.Manager.UpdatePackage(d.Package, specificVersion);
-					success = true;
-				}));
-			setupDialog.MainThreadRequired = false;
-			setupDialog.ShowDialog();
-			
-			if (packageNotFound)
-			{
-				MessageBox.Show(this, 
-					string.Format(PackageManagerFrontendRes.MsgTargetVersionNotFound_Desc, specificVersion, info.Id), 
-					PackageManagerFrontendRes.MsgTargetVersionNotFound_Caption, 
-					MessageBoxButtons.OK, 
-					MessageBoxIcon.Error);
-			}
-			if (cantUpdate)
-			{
-				MessageBox.Show(this, 
-					string.Format(PackageManagerFrontendRes.MsgTargetCantUpdate_Desc, specificVersion, info.Id), 
-					PackageManagerFrontendRes.MsgTargetCantUpdate_Caption, 
-					MessageBoxButtons.OK, 
-					MessageBoxIcon.Error);
-			}
-			if (!success) return;
-
-			this.modelInstalled.ApplyChanges();
-			this.restartRequired = true;
 			this.UpdateBottomButtons();
 		}
 		private void UpdateAllPackages()
 		{
+			if (!this.ConfirmCompatibility(this.packageManager.GetUpdatablePackages()))
+				return;
+
 			ProcessingBigTaskDialog setupDialog = new ProcessingBigTaskDialog(
 				PackageManagerFrontendRes.TaskUpdatePackages_Caption, 
 				PackageManagerFrontendRes.TaskUpdatePackages_Desc, 
@@ -386,9 +409,40 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 				this.packageManager);
 			setupDialog.MainThreadRequired = false;
 			setupDialog.ShowDialog();
+
+			this.packageList.Invalidate();
 			this.modelInstalled.ApplyChanges();
+			this.modelOnline.ApplyChanges();
 			this.restartRequired = true;
 			this.UpdateBottomButtons();
+		}
+		
+		private bool ConfirmCompatibility(PackageInfo package)
+		{
+			return this.ConfirmCompatibility(this.packageManager.GetCompatibilityLevel(package));
+		}
+		private bool ConfirmCompatibility(IEnumerable<PackageInfo> packages)
+		{
+			PackageCompatibility compatibility = PackageCompatibility.Definite;
+			foreach (PackageInfo package in packages)
+			{
+				PackageCompatibility otherCompat = this.packageManager.GetCompatibilityLevel(package);
+				compatibility = compatibility.Combine(otherCompat);
+			}
+			return this.ConfirmCompatibility(compatibility);
+		}
+		private bool ConfirmCompatibility(PackageCompatibility compatibility)
+		{
+			if (compatibility.IsAtLeast(PackageCompatibility.Likely)) return true;
+
+			DialogResult result = MessageBox.Show(this,
+				PackageManagerFrontendRes.MsgConfirmIncompatibleOperation_Desc,
+				PackageManagerFrontendRes.MsgConfirmIncompatibleOperation_Caption,
+				MessageBoxButtons.YesNo,
+				MessageBoxIcon.Warning,
+				MessageBoxDefaultButton.Button2);
+
+			return result == DialogResult.Yes;
 		}
 
 		protected override void OnLoad(EventArgs e)
@@ -400,13 +454,12 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 			this.packageManager = DualityEditorApp.PackageManager;
 			this.nodeTextBoxVersion.PackageManager = this.packageManager;
 
-			this.modelInstalled = new InstalledPackagesTreeModel(this.packageManager);
 			this.modelOnline = new OnlinePackagesTreeModel(this.packageManager);
-
 			this.modelOnline.SortComparer = new PackageListItemComparer(PackageListItemComparer.SortMode.CombinedScore, SortOrder.Ascending);
-
-			this.modelInstalled.NodesChanged += this.modelInstalled_NodesChanged;
 			this.modelOnline.NodesChanged += this.modelOnline_NodesChanged;
+
+			this.modelInstalled = new InstalledPackagesTreeModel(this.packageManager);
+			this.modelInstalled.NodesChanged += this.modelInstalled_NodesChanged;
 
 			this.Display = DisplayMode.Installed;
 
@@ -426,6 +479,8 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 		{
 			this.UpdateInfoArea();
 			this.UpdateBottomButtons();
+			this.packageList.UpdateNodeFilter();
+			this.packageList.Invalidate();
 			this.timerPackageModelChanged.Enabled = false;
 		}
 		private void modelOnline_NodesChanged(object sender, TreeModelEventArgs e)
@@ -503,7 +558,13 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 		}
 		private void labelPackageWebsite_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
 		{
-			Process.Start(this.labelPackageWebsite.Text);
+			if (this.labelPackageWebsite.Tag is Uri)
+				Process.Start((this.labelPackageWebsite.Tag as Uri).AbsoluteUri);
+		}
+		private void labelPackageLicense_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+		{
+			if (this.labelPackageLicense.Tag is Uri)
+				Process.Start((this.labelPackageLicense.Tag as Uri).AbsoluteUri);
 		}
 		private void nodeTextBoxDownloads_DrawText(object sender, DrawTextEventArgs e)
 		{
@@ -614,6 +675,14 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 			this.UpdateColumnVisibility();
 		}
 
+		private bool PackageListNodeFilter(TreeNodeAdv node)
+		{
+			PackageItem item = node.Tag as PackageItem;
+			if (item == null) return true;
+
+			return item.IsInstalled || item.Compatibility == PackageCompatibility.Unknown || item.Compatibility.IsAtLeast(PackageCompatibility.Likely);
+		}
+
 		private void UpdateColumnVisibility()
 		{
 			int colRefWidth = this.GetPackageListMainColumnWidth(c => 
@@ -685,9 +754,14 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 			workerInterface.Progress = 0.0f;
 			workerInterface.StateDesc = GeneralRes.TaskPrepareInfo;
 			yield return null;
+			
+			// Determine which packages need to be updated
+			PackageInfo[] updatePackages = manager.GetUpdatablePackages().ToArray();
 
-			PackageInfo[] updatePackages = manager.GetSafeUpdateConfig(manager.LocalPackages).ToArray();
+			// Sort packages by their dependencies so we don't accidentally install multiple versions
 			manager.OrderByDependencies(updatePackages);
+
+			// Start the updating process
 			foreach (PackageInfo package in updatePackages)
 			{
 				workerInterface.Progress += 1.0f / updatePackages.Length;
@@ -696,7 +770,7 @@ namespace Duality.Editor.Plugins.PackageManagerFrontend
 
 				try
 				{
-					manager.UpdatePackage(package, package.Version);
+					manager.UpdatePackage(package);
 				}
 				catch (Exception e)
 				{

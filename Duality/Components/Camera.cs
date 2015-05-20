@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 
-using OpenTK.Graphics.OpenGL;
-using OpenTK;
-
 using Duality.Editor;
 using Duality.Cloning;
 using Duality.Drawing;
@@ -17,7 +14,6 @@ namespace Duality.Components
 	/// <summary>
 	/// A Camera is responsible for rendering the current <see cref="Duality.Resources.Scene"/>.
 	/// </summary>
-	[Serializable]
 	[RequiredComponent(typeof(Transform))]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageCamera)]
@@ -26,7 +22,6 @@ namespace Duality.Components
 		/// <summary>
 		/// Describes a single pass in the overall rendering process.
 		/// </summary>
-		[Serializable]
 		public class Pass
 		{
 			private ColorRgba					clearColor		= ColorRgba.TransparentBlack;
@@ -35,9 +30,9 @@ namespace Duality.Components
 			private RenderMatrix				matrixMode		= RenderMatrix.PerspectiveWorld;
 			private	VisibilityFlag				visibilityMask	= VisibilityFlag.AllGroups;
 			private	BatchInfo					input			= null;
-			private	ContentRef<RenderTarget>	output			= ContentRef<RenderTarget>.Null;
+			private	ContentRef<RenderTarget>	output			= null;
 
-			[NonSerialized]
+			[DontSerialize]
 			private EventHandler<CollectDrawcallEventArgs> collectDrawcalls	= null;
 
 			/// <summary>
@@ -150,7 +145,7 @@ namespace Duality.Components
 
 			public override string ToString()
 			{
-				ContentRef<Texture> inputTex = input == null ? ContentRef<Texture>.Null : input.MainTexture;
+				ContentRef<Texture> inputTex = input == null ? null : input.MainTexture;
 				return string.Format("{0} => {1}{2}",
 					inputTex.IsExplicitNull ? (input == null ? "Camera" : "Undefined") : inputTex.Name,
 					output.IsExplicitNull ? "Screen" : output.Name,
@@ -166,13 +161,13 @@ namespace Duality.Components
 		private	VisibilityFlag	visibilityMask	= VisibilityFlag.All;
 		private	List<Pass>	passes				= new List<Pass>();
 
-		[NonSerialized] private	DrawDevice			drawDevice		= null;
-		[NonSerialized] private	List<ICmpRenderer>	pickingMap		= null;
-		[NonSerialized] private	RenderTarget		pickingRT		= null;
-		[NonSerialized] private	Texture				pickingTex		= null;
-		[NonSerialized] private	int					pickingLast		= -1;
-		[NonSerialized] private	byte[]				pickingBuffer	= new byte[4 * 256 * 256];
-		[NonSerialized] private	List<Predicate<ICmpRenderer>>	editorRenderFilter	= new List<Predicate<ICmpRenderer>>();
+		[DontSerialize] private	DrawDevice			drawDevice		= null;
+		[DontSerialize] private	List<ICmpRenderer>	pickingMap		= null;
+		[DontSerialize] private	RenderTarget		pickingRT		= null;
+		[DontSerialize] private	Texture				pickingTex		= null;
+		[DontSerialize] private	int					pickingLast		= -1;
+		[DontSerialize] private	byte[]				pickingBuffer	= new byte[4 * 256 * 256];
+		[DontSerialize] private	List<Predicate<ICmpRenderer>>	editorRenderFilter	= new List<Predicate<ICmpRenderer>>();
 
 		
 		/// <summary>
@@ -292,7 +287,6 @@ namespace Duality.Components
 			{
 				this.RenderSinglePass(viewportRect, t);
 			}
-			RenderTarget.Bind(RenderTarget.None);
 			this.drawDevice.VisibilityMask = this.visibilityMask;
 			this.drawDevice.RenderMode = RenderMatrix.PerspectiveWorld;
 			this.drawDevice.UpdateMatrices(); // Reset matrices for projection calculations during update
@@ -327,26 +321,17 @@ namespace Duality.Components
 				this.drawDevice.ViewportRect = new Rect(this.pickingTex.PixelWidth, this.pickingTex.PixelHeight);
 
 				// Render Scene
-				this.drawDevice.BeginRendering(ClearFlag.All, ColorRgba.Black, 1.0f);
+				this.drawDevice.PrepareForDrawcalls();
 				this.CollectDrawcalls();
-				this.drawDevice.EndRendering();
+				this.drawDevice.Render(ClearFlag.All, ColorRgba.Black, 1.0f);
 				this.drawDevice.PickingIndex = 0;
-
-				GL.Finish();
-				RenderTarget.Bind(RenderTarget.None);
 			}
 
 			// Move data to local buffer
 			int pxNum = this.pickingTex.PixelWidth * this.pickingTex.PixelHeight;
 			int pxByteNum = pxNum * 4;
 			if (pxByteNum > this.pickingBuffer.Length) Array.Resize(ref this.pickingBuffer, Math.Max(this.pickingBuffer.Length * 2, pxByteNum));
-
-			ContentRef<RenderTarget> lastTex = RenderTarget.BoundRT;
-			RenderTarget.Bind(this.pickingRT);
-			GL.ReadBuffer(ReadBufferMode.ColorAttachment0);
-			GL.ReadPixels(0, 0, this.pickingTex.PixelWidth, this.pickingTex.PixelHeight, PixelFormat.Rgba, PixelType.UnsignedByte, this.pickingBuffer);
-			RenderTarget.Bind(lastTex);
-			GL.ReadBuffer(ReadBufferMode.Back);
+			this.pickingRT.GetPixelData(this.pickingBuffer);
 
 			Profile.TimeVisualPicking.EndMeasure();
 			return true;
@@ -360,8 +345,8 @@ namespace Duality.Components
 		/// <returns>The <see cref="Duality.ICmpRenderer"/> that owns the pixel.</returns>
 		public ICmpRenderer PickRendererAt(Rect viewportRect, int x, int y)
 		{
-			if (x < viewportRect.MinimumX || x >= viewportRect.MaximumX) return null;
-			if (y < viewportRect.MinimumY || y >= viewportRect.MaximumY) return null;
+			if (x < viewportRect.MinX || x >= viewportRect.MaxX) return null;
+			if (y < viewportRect.MinY || y >= viewportRect.MaxY) return null;
 			
 			this.RenderPickingMap(viewportRect.Size);
 
@@ -556,7 +541,7 @@ namespace Duality.Components
 			if (p.Input == null)
 			{
 				// Render Scene
-				this.drawDevice.BeginRendering(p.ClearFlags, p.ClearColor, p.ClearDepth);
+				this.drawDevice.PrepareForDrawcalls();
 				try
 				{
 					this.CollectDrawcalls();
@@ -566,12 +551,12 @@ namespace Duality.Components
 				{
 					Log.Core.WriteError("There was an error while {0} was collecting drawcalls: {1}", this.ToString(), Log.Exception(e));
 				}
-				this.drawDevice.EndRendering();
+				this.drawDevice.Render(p.ClearFlags, p.ClearColor, p.ClearDepth);
 			}
 			else
 			{
 				Profile.TimePostProcessing.BeginMeasure();
-				this.drawDevice.BeginRendering(p.ClearFlags, p.ClearColor, p.ClearDepth);
+				this.drawDevice.PrepareForDrawcalls();
 
 				Texture mainTex = p.Input.MainTexture.Res;
 				Vector2 uvRatio = mainTex != null ? mainTex.UVRatio : Vector2.One;
@@ -584,13 +569,20 @@ namespace Duality.Components
 					targetRect = new Rect(this.drawDevice.TargetSize);
 
 				IDrawDevice device = this.drawDevice;
-				device.AddVertices(p.Input, VertexMode.Quads,
-					new VertexC1P3T2(targetRect.MinimumX,	targetRect.MinimumY,	0.0f,	0.0f,		0.0f),
-					new VertexC1P3T2(targetRect.MaximumX,	targetRect.MinimumY,	0.0f,	uvRatio.X,	0.0f),
-					new VertexC1P3T2(targetRect.MaximumX,	targetRect.MaximumY,	0.0f,	uvRatio.X,	uvRatio.Y),
-					new VertexC1P3T2(targetRect.MinimumX,	targetRect.MaximumY,	0.0f,	0.0f,		uvRatio.Y));
+				{
+					VertexC1P3T2[] vertices = new VertexC1P3T2[4];
+					vertices[0].Pos = new Vector3(targetRect.MinX, targetRect.MinY, 0.0f);
+					vertices[1].Pos = new Vector3(targetRect.MaxX, targetRect.MinY, 0.0f);
+					vertices[2].Pos = new Vector3(targetRect.MaxX, targetRect.MaxY, 0.0f);
+					vertices[3].Pos = new Vector3(targetRect.MinX, targetRect.MaxY, 0.0f);
+					vertices[0].TexCoord = new Vector2(0.0f, 0.0f);
+					vertices[1].TexCoord = new Vector2(uvRatio.X, 0.0f);
+					vertices[2].TexCoord = new Vector2(uvRatio.X, uvRatio.Y);
+					vertices[3].TexCoord = new Vector2(0.0f, uvRatio.Y);
+					device.AddVertices(p.Input, VertexMode.Quads, vertices);
+				}
 
-				this.drawDevice.EndRendering();
+				this.drawDevice.Render(p.ClearFlags, p.ClearColor, p.ClearDepth);
 				Profile.TimePostProcessing.EndMeasure();
 			}
 		}
@@ -644,7 +636,7 @@ namespace Duality.Components
 				if (this.pickingTex != null) this.pickingTex.Dispose();
 				if (this.pickingRT != null) this.pickingRT.Dispose();
 				this.pickingTex = new Texture(
-					MathF.RoundToInt(size.X), MathF.RoundToInt(size.Y), Texture.SizeMode.Default, 
+					MathF.RoundToInt(size.X), MathF.RoundToInt(size.Y), TextureSizeMode.Default, 
 					TextureMagFilter.Nearest, TextureMinFilter.Nearest);
 				this.pickingRT = new RenderTarget(AAQuality.Off, this.pickingTex);
 			}

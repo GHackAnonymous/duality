@@ -93,7 +93,7 @@ namespace Duality.Serialization
 
 	/// <summary>
 	/// A serialization error that occurred during the assignment of a Field. Possible causes are the Field not being
-	/// available, being flagged as [NonSerialized] or having the wrong FieldType.
+	/// available, being flagged as [DontSerialize] or having the wrong FieldType.
 	/// </summary>
 	public class AssignFieldError : SerializeError
 	{
@@ -131,7 +131,7 @@ namespace Duality.Serialization
 			get { return this.fieldValue; }
 		}
 		/// <summary>
-		/// [GET / SET] Whether or not the assignment was a success. Set this field to true, if you handled the error successfully.
+		/// [GET / SET] Whether or not the assignment was a success. Set this property to true, if you handled the error successfully.
 		/// </summary>
 		public bool AssignSuccess
 		{

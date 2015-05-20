@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK;
-
 using Duality.Editor;
 using Duality.Resources;
 using Duality.Properties;
+using Duality.Audio;
 using Duality.Cloning;
 
 namespace Duality.Components
@@ -14,7 +13,6 @@ namespace Duality.Components
 	/// <summary>
 	/// Provides functionality to emit sound.
 	/// </summary>
-	[Serializable]
 	[RequiredComponent(typeof(Transform))]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategorySound)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageSoundEmitter)]
@@ -23,18 +21,17 @@ namespace Duality.Components
 		/// <summary>
 		/// A single sound source.
 		/// </summary>
-		[Serializable]
 		public class Source : ICloneExplicit
 		{
-			private	ContentRef<Sound>	sound			= ContentRef<Sound>.Null;
+			private	ContentRef<Sound>	sound			= null;
 			private	bool				looped			= true;
 			private	bool				paused			= false;
 			private	float				volume			= 1.0f;
 			private	float				pitch			= 1.0f;
 			private	Vector3				offset			= Vector3.Zero;
-			[NonSerializedResource]
+			[DontSerializeResource]
 			private	bool				hasBeenPlayed	= false;
-			[NonSerialized] private	SoundInstance	instance		= null;
+			[DontSerialize] private	SoundInstance	instance		= null;
 
 			/// <summary>
 			/// [GET] The <see cref="SoundInstance"/> that is currently allocated to emit

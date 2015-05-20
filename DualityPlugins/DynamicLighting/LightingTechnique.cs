@@ -7,11 +7,8 @@ using Duality.Properties;
 using Duality.Drawing;
 using Duality.Plugins.DynamicLighting.Properties;
 
-using OpenTK;
-
 namespace Duality.Plugins.DynamicLighting
 {
-	[Serializable]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(DynLightRes), DynLightResNames.IconResourceLightingTechnique)]
 	public class LightingTechnique : DrawTechnique
@@ -21,7 +18,7 @@ namespace Duality.Plugins.DynamicLighting
 			get { return true; }
 		}
 
-		protected override void PrepareRendering(IDrawDevice device, BatchInfo material)
+		public override void PrepareRendering(IDrawDevice device, BatchInfo material)
 		{
 			base.PrepareRendering(device, material);
 

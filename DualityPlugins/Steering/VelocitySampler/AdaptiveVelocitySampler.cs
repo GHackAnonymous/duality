@@ -1,5 +1,4 @@
 ﻿using Duality;
-using OpenTK;
 using System;
 using System.Collections.Generic;
 
@@ -11,13 +10,12 @@ namespace Duality.Plugins.Steering
 	/// This reduces samples needed massively compared to <see cref="BruteForceVelocitySampler"/>
 	/// but can potentially lead to undesired behavior.
 	/// </summary>
-	[Serializable]
 	public class AdaptiveVelocitySampler : IVelocitySampler
 	{
 		private int layerCount				= 5;
 		private int outerLayerSampleCount	= 11;
 
-		[NonSerialized] private int currentSampleIdx = 0;
+		[DontSerialize] private int currentSampleIdx = 0;
 
 		public void Reset()
 		{

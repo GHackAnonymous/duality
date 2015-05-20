@@ -6,8 +6,6 @@ using Duality.Drawing;
 using Duality.Editor;
 using Duality.Properties;
 
-using OpenTK.Graphics.OpenGL;
-
 namespace Duality.Resources
 {
 	/// <summary>
@@ -17,16 +15,10 @@ namespace Duality.Resources
 	/// <seealso cref="Duality.Resources.Material"/>
 	/// <seealso cref="Duality.Resources.ShaderProgram"/>
 	/// <seealso cref="Duality.Drawing.BlendMode"/>
-	[Serializable]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImageDrawTechnique)]
 	public class DrawTechnique : Resource
 	{
-		/// <summary>
-		/// A DrawTechnique resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(DrawTechnique));
-		
 		/// <summary>
 		/// Renders solid geometry without utilizing the alpha channel. This is the fastest default DrawTechnique.
 		/// </summary>
@@ -98,21 +90,6 @@ namespace Duality.Resources
 		/// </summary>
 		public static ContentRef<DrawTechnique> SmoothAnim_Invert	{ get; private set; }
 
-		/// <summary>
-		/// [GET] Returns whether the <see cref="BlendMode.Mask">masked</see> DrawTechniques utilize OpenGL Alpha-to-Coverage to
-		/// smooth alpha-edges in masked rendering.
-		/// </summary>
-		public static bool MaskUseAlphaToCoverage 
-		{ 
-			get 
-			{
-				if (RenderTarget.BoundRT.IsExplicitNull)
-					return DualityApp.TargetMode.Samples > 0; 
-				else
-					return RenderTarget.BoundRT.Res.Samples > 0;
-			}
-		}
-
 		internal static void InitDefaultContent()
 		{
 			const string VirtualContentPath		= ContentProvider.VirtualContentPath + "DrawTechnique:";
@@ -138,22 +115,22 @@ namespace Duality.Resources
 
 			ContentProvider.AddContent(ContentPath_Solid,		new DrawTechnique(BlendMode.Solid));
 			ContentProvider.AddContent(ContentPath_Mask,		new DrawTechnique(BlendMode.Mask));
-			ContentProvider.AddContent(ContentPath_Add,		new DrawTechnique(BlendMode.Add));
+			ContentProvider.AddContent(ContentPath_Add,			new DrawTechnique(BlendMode.Add));
 			ContentProvider.AddContent(ContentPath_Alpha,		new DrawTechnique(BlendMode.Alpha));
 			ContentProvider.AddContent(ContentPath_Multiply,	new DrawTechnique(BlendMode.Multiply));
 			ContentProvider.AddContent(ContentPath_Light,		new DrawTechnique(BlendMode.Light));
 			ContentProvider.AddContent(ContentPath_Invert,		new DrawTechnique(BlendMode.Invert));
 
-			ContentProvider.AddContent(ContentPath_Picking,	new DrawTechnique(BlendMode.Mask, ShaderProgram.Picking));
+			ContentProvider.AddContent(ContentPath_Picking,		new DrawTechnique(BlendMode.Mask, ShaderProgram.Picking));
 			ContentProvider.AddContent(ContentPath_SharpMask,	new DrawTechnique(BlendMode.Alpha, ShaderProgram.SharpAlpha));
 			
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Solid,		new DrawTechnique(BlendMode.Solid,		ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Mask,		new DrawTechnique(BlendMode.Mask,		ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Add,			new DrawTechnique(BlendMode.Add,		ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Alpha,		new DrawTechnique(BlendMode.Alpha,		ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Multiply,	new DrawTechnique(BlendMode.Multiply,	ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Light,		new DrawTechnique(BlendMode.Light,		ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
-			ContentProvider.AddContent(ContentPath_SmoothAnim_Invert,		new DrawTechnique(BlendMode.Invert,		ShaderProgram.SmoothAnim, VertexType_C1P3T4A1));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Solid,	new DrawTechnique(BlendMode.Solid,		ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Mask,		new DrawTechnique(BlendMode.Mask,		ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Add,		new DrawTechnique(BlendMode.Add,		ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Alpha,	new DrawTechnique(BlendMode.Alpha,		ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Multiply,	new DrawTechnique(BlendMode.Multiply,	ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Light,	new DrawTechnique(BlendMode.Light,		ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
+			ContentProvider.AddContent(ContentPath_SmoothAnim_Invert,	new DrawTechnique(BlendMode.Invert,		ShaderProgram.SmoothAnim, VertexC1P3T4A1.Declaration));
 
 			Solid		= ContentProvider.RequestContent<DrawTechnique>(ContentPath_Solid);
 			Mask		= ContentProvider.RequestContent<DrawTechnique>(ContentPath_Mask);
@@ -173,70 +150,13 @@ namespace Duality.Resources
 			SmoothAnim_Light	= ContentProvider.RequestContent<DrawTechnique>(ContentPath_SmoothAnim_Light);
 			SmoothAnim_Invert	= ContentProvider.RequestContent<DrawTechnique>(ContentPath_SmoothAnim_Invert);
 		}
-		static DrawTechnique()
-		{
-			InitVertexTypeIndices();
-		}
 		
-		/// <summary>
-		/// The maximum number of vertex types.
-		/// </summary>
-		public	const	int		MaxVertexTypes		= 16;
-		/// <summary>
-		/// Unknown format.
-		/// </summary>
-		public	const	int		VertexType_Unknown	= -1;
-		/// <summary>
-		/// <see cref="Duality.Drawing.VertexC1P3"/> format.
-		/// </summary>
-		public	const	int		VertexType_C1P3		= 1;
-		/// <summary>
-		/// <see cref="Duality.Drawing.VertexC1P3T2"/> format.
-		/// </summary>
-		public	const	int		VertexType_C1P3T2	= 2;
-		/// <summary>
-		/// <see cref="Duality.Drawing.VertexC1P3T4A1"/> format.
-		/// </summary>
-		public	const	int		VertexType_C1P3T4A1	= 3;
-
-		private static Dictionary<string,int>	vertexTypeIndexMap	= new Dictionary<string,int>();
-		public static IEnumerable<KeyValuePair<string,int>> VertexTypeIndices
-		{
-			get { return vertexTypeIndexMap; }
-		}
-
-		private static void InitVertexTypeIndices()
-		{
-			vertexTypeIndexMap.Clear();
-			vertexTypeIndexMap["Unknown"]					= VertexType_Unknown;
-			vertexTypeIndexMap[typeof(VertexC1P3).Name]		= VertexType_C1P3;
-			vertexTypeIndexMap[typeof(VertexC1P3T2).Name]	= VertexType_C1P3T2;
-			vertexTypeIndexMap[typeof(VertexC1P3T4A1).Name] = VertexType_C1P3T4A1;
-		}
-		public static int RequestVertexTypeIndex(string name)
-		{
-			int index;
-			if (vertexTypeIndexMap.TryGetValue(name, out index)) return index;
-			for (int i = 0; i < MaxVertexTypes; i++)
-			{
-				if (!vertexTypeIndexMap.Values.Contains(i))
-				{
-					vertexTypeIndexMap[name] = i;
-					return i;
-				}
-			}
-			throw new InvalidOperationException("Maximum number of vertex formats reached");
-		}
-		public static void ReleaseVertexTypeIndex(string name)
-		{
-			if (name == "Unknown") return;
-			vertexTypeIndexMap.Remove(name);
-		}
-
 
 		private	BlendMode					blendType	= BlendMode.Solid;
-		private	ContentRef<ShaderProgram>	shader		= ContentRef<ShaderProgram>.Null;
-		private	int							formatPref	= VertexType_Unknown;
+		private	ContentRef<ShaderProgram>	shader		= null;
+		private	Type						prefType	= null;
+		[DontSerialize]
+		private	VertexDeclaration		prefFormat	= null;
 
 		/// <summary>
 		/// [GET / SET] Specifies how incoming color values interact with the existing background color.
@@ -257,12 +177,16 @@ namespace Duality.Resources
 		}
 		/// <summary>
 		/// [GET / SET] The vertex format that is preferred by this DrawTechnique. If there is no specific preference,
-		/// <see cref="VertexType_Unknown"/> is returned.
+		/// null is returned.
 		/// </summary>
-		public int PreferredVertexFormat
+		public VertexDeclaration PreferredVertexFormat
 		{
-			get { return this.formatPref; }
-			set { this.formatPref = value; }
+			get { return this.prefFormat; }
+			set
+			{
+				this.prefFormat = value;
+				this.prefType = value != null ? value.DataType : null;
+			}
 		}
 		/// <summary>
 		/// [GET] Returns whether this DrawTechnique requires z sorting. It is derived from its <see cref="Blending"/>.
@@ -279,14 +203,6 @@ namespace Duality.Resources
 					this.blendType == BlendMode.Multiply ||
 					this.blendType == BlendMode.Light; 
 			}
-		}
-		/// <summary>
-		/// [GET] Returns whether this DrawTechnique requires <see cref="PreprocessBatch{T}">vertex preprocessing</see>.
-		/// This is false for all standard DrawTechniques, but may return true when deriving custom DrawTechniques.
-		/// </summary>
-		public virtual bool NeedsPreprocess
-		{
-			get { return false; }
 		}
 		/// <summary>
 		/// [GET] Returns whether this DrawTechnique requires any <see cref="PrepareRendering">rendering preparation</see>.
@@ -315,202 +231,25 @@ namespace Duality.Resources
 		/// <param name="blendType"></param>
 		/// <param name="shader"></param>
 		/// <param name="formatPref"></param>
-		public DrawTechnique(BlendMode blendType, ContentRef<ShaderProgram> shader, int formatPref = VertexType_Unknown) 
+		public DrawTechnique(BlendMode blendType, ContentRef<ShaderProgram> shader, VertexDeclaration formatPref = null) 
 		{
 			this.blendType = blendType;
 			this.shader = shader;
-			this.formatPref = formatPref;
-		}
-		
-		/// <summary>
-		/// Performs a preprocessing operation for incoming vertices. Does nothing by default but may be overloaded, if needed.
-		/// </summary>
-		/// <typeparam name="T">The incoming vertex type</typeparam>
-		/// <param name="device"></param>
-		/// <param name="material"><see cref="Duality.Resources.Material"/> information for the current batch.</param>
-		/// <param name="vertexMode">The mode of incoming vertex data.</param>
-		/// <param name="vertexBuffer">A buffer storing incoming vertex data.</param>
-		/// <param name="vertexCount">The number of vertices to preprocess, beginning at the start of the specified buffer.</param>
-		public virtual void PreprocessBatch<T>(IDrawDevice device, BatchInfo material, ref VertexMode vertexMode, ref T[] vertexBuffer, ref int vertexCount) {}
-		/// <summary>
-		/// Sets up the appropriate OpenGL rendering state for this DrawTechnique.
-		/// </summary>
-		/// <param name="lastTechnique">The last DrawTechnique that has been set up. This parameter is optional, but
-		/// specifying it will increase performance by reducing redundant state changes.</param>
-		/// <param name="textures">A set of <see cref="Duality.Resources.Texture">Textures</see> to use.</param>
-		/// <param name="uniforms">A set of <see cref="Duality.Resources.ShaderVarInfo">uniform values</see> to apply.</param>
-		public void SetupForRendering(IDrawDevice device, BatchInfo material, DrawTechnique lastTechnique)
-		{
-			// Prepare Rendering
-			if (this.NeedsPreparation)
-			{
-				// Clone the material, if not done yet due to vertex preprocessing
-				if (!this.NeedsPreprocess) material = new BatchInfo(material);
-				this.PrepareRendering(device, material);
-			}
-			
-			// Setup BlendType
-			if (lastTechnique == null || this.blendType != lastTechnique.blendType)
-				this.SetupBlendType(this.blendType, device.DepthWrite);
-
-			// Bind Shader
-			ContentRef<ShaderProgram> selShader = this.SelectShader();
-			if (lastTechnique == null || selShader.Res != lastTechnique.shader.Res)
-				ShaderProgram.Bind(selShader);
-
-			// Setup shader data
-			if (selShader.IsAvailable)
-			{
-				ShaderVarInfo[] varInfo = selShader.Res.VarInfo;
-
-				// Setup sampler bindings automatically
-				int curSamplerIndex = 0;
-				if (material.Textures != null)
-				{
-					for (int i = 0; i < varInfo.Length; i++)
-					{
-						if (varInfo[i].glVarLoc == -1) continue;
-						if (varInfo[i].type != ShaderVarType.Sampler2D) continue;
-
-						// Bind Texture
-						ContentRef<Texture> texRef = material.GetTexture(varInfo[i].name);
-						Texture.Bind(texRef, curSamplerIndex);
-						GL.Uniform1(varInfo[i].glVarLoc, curSamplerIndex);
-
-						curSamplerIndex++;
-					}
-				}
-				Texture.ResetBinding(curSamplerIndex);
-
-				// Transfer uniform data from material to actual shader
-				if (material.Uniforms != null)
-				{
-					for (int i = 0; i < varInfo.Length; i++)
-					{
-						if (varInfo[i].glVarLoc == -1) continue;
-						float[] data = material.GetUniform(varInfo[i].name);
-						if (data == null) continue;
-						varInfo[i].SetupUniform(data);
-					}
-				}
-			}
-			// Setup fixed function data
-			else
-			{
-				// Fixed function texture binding
-				if (material.Textures != null)
-				{
-					int samplerIndex = 0;
-					foreach (var pair in material.Textures)
-					{
-						Texture.Bind(pair.Value, samplerIndex);
-						samplerIndex++;
-					}
-					Texture.ResetBinding(samplerIndex);
-				}
-				else
-					Texture.ResetBinding();
-			}
-		}
-		/// <summary>
-		/// Resets the OpenGL rendering state after finishing DrawTechnique-Setups. Only call this when there are no more
-		/// DrawTechniques to follow directly.
-		/// </summary>
-		public void FinishRendering()
-		{
-			this.SetupBlendType(BlendMode.Reset);
-			ShaderProgram.Bind(ContentRef<ShaderProgram>.Null);
-			Texture.ResetBinding();
+			this.prefFormat = formatPref;
+			this.prefType = formatPref != null ? formatPref.DataType : null;
 		}
 
-		/// <summary>
-		/// Sets up OpenGL rendering state according to a certain <see cref="BlendMode"/>.
-		/// </summary>
-		/// <param name="mode">The BlendMode to set up.</param>
-		/// <param name="depthWrite">Whether or not to allow writing depth values.</param>
-		protected void SetupBlendType(BlendMode mode, bool depthWrite = true)
-		{
-			switch (mode)
-			{
-				default:
-				case BlendMode.Reset:
-				case BlendMode.Solid:
-					GL.DepthMask(depthWrite);
-					GL.Disable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					break;
-				case BlendMode.Mask:
-					GL.DepthMask(depthWrite);
-					GL.Disable(EnableCap.Blend);
-					if (MaskUseAlphaToCoverage)
-					{
-						GL.Disable(EnableCap.AlphaTest);
-						GL.Enable(EnableCap.SampleAlphaToCoverage);
-					}
-					else
-					{
-						GL.Enable(EnableCap.AlphaTest);
-						GL.AlphaFunc(AlphaFunction.Gequal, 0.5f);
-					}
-					break;
-				case BlendMode.Alpha:
-					GL.DepthMask(false);
-					GL.Enable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
-					break;
-				case BlendMode.AlphaPre:
-					GL.DepthMask(false);
-					GL.Enable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					GL.BlendFuncSeparate(BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
-					break;
-				case BlendMode.Add:
-					GL.DepthMask(false);
-					GL.Enable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.One, BlendingFactorSrc.One, BlendingFactorDest.One);
-					break;
-				case BlendMode.Light:
-					GL.DepthMask(false);
-					GL.Enable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					GL.BlendFuncSeparate(BlendingFactorSrc.DstColor, BlendingFactorDest.One, BlendingFactorSrc.Zero, BlendingFactorDest.One);
-					break;
-				case BlendMode.Multiply:
-					GL.DepthMask(false);
-					GL.Enable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					GL.BlendFunc(BlendingFactorSrc.DstColor, BlendingFactorDest.Zero);
-					break;
-				case BlendMode.Invert:
-					GL.DepthMask(false);
-					GL.Enable(EnableCap.Blend);
-					GL.Disable(EnableCap.AlphaTest);
-					GL.Disable(EnableCap.SampleAlphaToCoverage);
-					GL.BlendFunc(BlendingFactorSrc.OneMinusDstColor, BlendingFactorDest.OneMinusSrcColor);
-					break;
-			}
-		}
-		/// <summary>
-		/// Dynamically selects the <see cref="Duality.Resources.ShaderProgram"/> to use. Just returns <see cref="Shader"/> by default.
-		/// </summary>
-		/// <returns>The selected <see cref="Duality.Resources.ShaderProgram"/>.</returns>
-		protected virtual ContentRef<ShaderProgram> SelectShader()
-		{
-			return this.shader;
-		}
 		/// <summary>
 		/// Prepares rendering using this DrawTechnique.
 		/// </summary>
 		/// <param name="device"></param>
 		/// <param name="material"></param>
-		protected virtual void PrepareRendering(IDrawDevice device, BatchInfo material) {}
+		public virtual void PrepareRendering(IDrawDevice device, BatchInfo material) {}
+
+		protected override void OnLoaded()
+		{
+			base.OnLoaded();
+			this.prefFormat = VertexDeclaration.Get(this.prefType);
+		}
 	}
 }

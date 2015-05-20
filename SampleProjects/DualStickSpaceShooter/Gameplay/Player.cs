@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using OpenTK;
-using OpenTK.Input;
-
 using Duality;
 using Duality.Components;
 using Duality.Components.Renderers;
@@ -15,7 +12,6 @@ using Duality.Drawing;
 
 namespace DualStickSpaceShooter
 {
-	[Serializable]
 	public class Player : Component, ICmpUpdatable
 	{
 		public const float RespawnDelay = 10000.0f;
@@ -44,9 +40,9 @@ namespace DualStickSpaceShooter
 		private	ContentRef<Sound>	weaponSound			= null;
 		private	ContentRef<Sound>	flightLoop			= null;
 
-		[NonSerialized]
+		[DontSerialize]
 		private	InputMapping	input				= null;
-		[NonSerialized]
+		[DontSerialize]
 		private	GameObject		goalEffectInstance	= null;
 
 

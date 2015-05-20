@@ -1,7 +1,5 @@
 ﻿using System;
 
-using OpenTK;
-
 using FarseerPhysics.Dynamics;
 using FarseerPhysics.Factories;
 using FarseerPhysics.Dynamics.Joints;
@@ -16,10 +14,9 @@ namespace Duality.Components.Physics
 	/// Describes a <see cref="RigidBody"/> joint. Joints limit a Colliders degree of freedom 
 	/// by connecting it to fixed world coordinates or other Colliders.
 	/// </summary>
-	[Serializable]
 	public abstract class JointInfo
 	{
-		[NonSerialized]	
+		[DontSerialize]	
 		internal protected	Joint	joint	= null;
 		[CloneBehavior(CloneBehavior.WeakReference)]
 		private		RigidBody	parentBody	= null;

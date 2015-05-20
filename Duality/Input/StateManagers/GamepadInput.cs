@@ -2,11 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK;
-using OpenTK.Input;
-
-
-namespace Duality
+namespace Duality.Input
 {
 	/// <summary>
 	/// Provides access to gamepad user input.
@@ -237,6 +233,7 @@ namespace Duality
 					if (this.ButtonDown != null)
 					{
 						this.ButtonDown(this, new GamepadButtonEventArgs(
+							this,
 							(GamepadButton)i, 
 							this.currentState.ButtonPressed[i]));
 					}
@@ -246,6 +243,7 @@ namespace Duality
 					if (this.ButtonUp != null)
 					{
 						this.ButtonUp(this, new GamepadButtonEventArgs(
+							this,
 							(GamepadButton)i, 
 							this.currentState.ButtonPressed[i]));
 					}
@@ -258,6 +256,7 @@ namespace Duality
 					if (this.Move != null)
 					{
 						this.Move(this, new GamepadAxisEventArgs(
+							this,
 							(GamepadAxis)i,
 							this.currentState.AxisValue[i],
 							this.currentState.AxisValue[i] - this.lastState.AxisValue[i]));

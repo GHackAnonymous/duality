@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Forms;
 using System.Drawing;
@@ -14,15 +15,12 @@ using Duality.Components;
 using Duality.Serialization;
 using Duality.Resources;
 using Duality.Drawing;
+using Duality.Backend;
+using Duality.Editor.Backend;
 using Duality.Editor.Forms;
 using Duality.Editor.UndoRedoActions;
 using Duality.Editor.PackageManagement;
 
-using OpenTK;
-using OpenTK.Platform;
-using OpenTK.Platform.Windows;
-
-using Ionic.Zip;
 using WeifenLuo.WinFormsUI.Docking;
 
 namespace Duality.Editor
@@ -69,7 +67,8 @@ namespace Duality.Editor
 		public	const	string	ActionContextOpenRes	= "OpenRes";
 		
 		private	static MainForm						mainForm			= null;
-		private	static GLControl					mainContextControl	= null;
+		private	static IEditorGraphicsBackend		graphicsBack		= null;
+		private	static INativeEditorGraphicsContext			mainGraphicsContext	= null;
 		private	static List<EditorPlugin>			plugins				= new List<EditorPlugin>();
 		private	static Dictionary<Type,List<Type>>	availTypeDict		= new Dictionary<Type,List<Type>>();
 		private	static List<IEditorAction>			editorActions		= new List<IEditorAction>();
@@ -78,7 +77,6 @@ namespace Duality.Editor
 		private	static GameObjectManager			editorObjects		= new GameObjectManager();
 		private	static HashSet<GameObject>			updateObjects		= new HashSet<GameObject>();
 		private	static bool							dualityAppSuspended	= true;
-		private	static HashSet<IWindowInfo>			glSwapBuffers		= new HashSet<IWindowInfo>();
 		private	static List<Resource>				unsavedResources	= new List<Resource>();
 		private	static ObjectSelection				selectionCurrent	= ObjectSelection.Null;
 		private	static ObjectSelection				selectionPrevious	= ObjectSelection.Null;
@@ -236,11 +234,17 @@ namespace Duality.Editor
 			EditorHintImageAttribute.ImageResolvers += EditorHintImageResolver;
 			DualityApp.PluginReady += DualityApp_PluginReady;
 			DualityApp.Init(DualityApp.ExecutionEnvironment.Editor, DualityApp.ExecutionContext.Editor, new[] {"logfile", "logfile_editor"});
-			InitMainGLContext();
-			DualityApp.InitGraphics();
+			
+			// Need to load editor plugins before initializing the graphics context, so the backend is available
 			LoadPlugins();
+
+			// Need to initialize graphics context and default content before instantiating anything that could require any of them
+			InitMainGraphicsContext();
+			DualityApp.InitPostWindow();
+
 			LoadUserData();
 			InitPlugins();
+
 
 			// Set up core plugin reloader
 			corePluginReloader = new ReloadCorePluginDialog(mainForm);
@@ -287,7 +291,7 @@ namespace Duality.Editor
 			Application.AddMessageFilter(menuKeyInterceptor);
 
 			// If there are no Scenes in the current project, init the first one with some default objects.
-			if (!Directory.EnumerateFiles(DualityApp.DataDirectory, "*" + Scene.FileExt, SearchOption.AllDirectories).Any())
+			if (!Directory.EnumerateFiles(DualityApp.DataDirectory, "*" + Resource.GetFileExtByType<Scene>(), SearchOption.AllDirectories).Any())
 			{
 				GameObject mainCam = new GameObject("MainCamera");
 				mainCam.AddComponent<Transform>().Pos = new Vector3(0, 0, -DrawDevice.DefaultFocusDist);
@@ -366,6 +370,9 @@ namespace Duality.Editor
 				FileImportProvider.Terminate();
 				DesignTimeObjectData.Terminate();
 
+				// Shut down the editor backend
+				DualityApp.ShutdownBackend(ref graphicsBack);
+
 				// Terminate Duality
 				DualityApp.Terminate();
 			}
@@ -392,7 +399,6 @@ namespace Duality.Editor
 						continue;
 					}
 					EditorPlugin plugin = (EditorPlugin)pluginType.CreateInstanceOf();
-					plugin.LoadPlugin();
 					plugins.Add(plugin);
 				}
 				catch (Exception e)
@@ -610,53 +616,32 @@ namespace Duality.Editor
 			}
 		}
 
-		public static void InitMainGLContext()
+		private static void InitMainGraphicsContext()
 		{
-			if (mainContextControl != null) return;
+			if (mainGraphicsContext != null) return;
 
-			// Since we'll be using only one context, we don't need sharing
-			OpenTK.Graphics.GraphicsContext.ShareContexts = false;
+			if (graphicsBack == null)
+				DualityApp.InitBackend(out graphicsBack, GetAvailDualityEditorTypes);
 
-			mainContextControl = new GLControl(DualityApp.DefaultMode);
-			mainContextControl.VSync = false;
-			mainContextControl.MakeCurrent();
-			DualityApp.TargetMode = mainContextControl.Context.GraphicsMode;
-		}
-		public static void GLMakeCurrent(GLControl control)
-		{
-			mainContextControl.Context.MakeCurrent(control.WindowInfo);
-		}
-		public static void GLSwapBuffers(GLControl control)
-		{
-			glSwapBuffers.Add(control.WindowInfo);
-		}
-		public static void GLUpdateBufferSwap()
-		{
-			// Perform a buffer swap
-			if (glSwapBuffers.Count > 0)
+			try
 			{
-				Profile.TimeRender.BeginMeasure();
-				Profile.TimeSwapBuffers.BeginMeasure();
-				foreach (IWindowInfo window in glSwapBuffers)
-				{
-					// Wrap actual buffer swapping in a try-catch block, since
-					// it is possible that the window has been disposed, but we have
-					// no way of checking its disposal state... so let's try it the hard way.
-					try
-					{
-						mainContextControl.Context.MakeCurrent(window);
-						mainContextControl.SwapBuffers();
-					}
-					catch (Exception) {}
-				}
-				Profile.TimeSwapBuffers.EndMeasure();
-				Profile.TimeRender.EndMeasure();
-				glSwapBuffers.Clear();
+				mainGraphicsContext = graphicsBack.CreateContext();
+			}
+			catch (Exception e)
+			{
+				mainGraphicsContext = null;
+				Log.Editor.WriteError("Can't create editor graphics context, because an error occurred: {0}", Log.Exception(e));
 			}
 		}
-		public static GLControl GLCreateControl()
+		public static void PerformBufferSwap()
 		{
-			return new GLControl(mainContextControl.GraphicsMode);
+			if (mainGraphicsContext == null) return;
+			mainGraphicsContext.PerformBufferSwap();
+		}
+		public static INativeRenderableSite CreateRenderableSite()
+		{
+			if (mainGraphicsContext == null) return null;
+			return mainGraphicsContext.CreateRenderableSite();
 		}
 
 		public static void UpdateGameObject(GameObject obj)
@@ -718,7 +703,7 @@ namespace Duality.Editor
 			else if (!skipYetUnsaved)
 			{
 				string basePath = Path.Combine(DualityApp.DataDirectory, "Scene");
-				string path = PathHelper.GetFreePath(basePath, Scene.FileExt);
+				string path = PathHelper.GetFreePath(basePath, Resource.GetFileExtByType<Scene>());
 				Scene.Current.Save(path);
 				DualityApp.AppData.Version++;
 				
@@ -821,18 +806,19 @@ namespace Duality.Editor
 				XDocument userDoc;
 				const string userFileCore = EditorHelper.SourceCodeProjectCorePluginFile + ".user";
 				const string userFileEditor = EditorHelper.SourceCodeProjectEditorPluginFile + ".user";
-				ZipFile gamePluginZip = null;
 
 				if (!File.Exists(userFileCore))
 				{
-					if (gamePluginZip == null)
-						gamePluginZip = ZipFile.Read(Properties.GeneralRes.GamePluginTemplate);
-					foreach (var e in gamePluginZip.Entries)
+					using (MemoryStream gamePluginStream = new MemoryStream(Properties.GeneralRes.GamePluginTemplate))
+					using (ZipArchive gamePluginZip = null)
 					{
-						if (string.Equals(Path.GetFileName(e.FileName), Path.GetFileName(userFileCore), StringComparison.InvariantCultureIgnoreCase))
+						foreach (var e in gamePluginZip.Entries)
 						{
-							e.Extract(EditorHelper.SourceCodeDirectory);
-							break;
+							if (string.Equals(Path.GetFileName(e.FullName), Path.GetFileName(userFileCore), StringComparison.InvariantCultureIgnoreCase))
+							{
+								e.Extract(EditorHelper.SourceCodeDirectory, true);
+								break;
+							}
 						}
 					}
 				}
@@ -848,14 +834,16 @@ namespace Duality.Editor
 				
 				if (!File.Exists(userFileEditor))
 				{
-					if (gamePluginZip == null)
-						gamePluginZip = ZipFile.Read(Properties.GeneralRes.GamePluginTemplate);
-					foreach (var e in gamePluginZip.Entries)
+					using (MemoryStream gamePluginStream = new MemoryStream(Properties.GeneralRes.GamePluginTemplate))
+					using (ZipArchive gamePluginZip = null)
 					{
-						if (string.Equals(Path.GetFileName(e.FileName), Path.GetFileName(userFileEditor), StringComparison.InvariantCultureIgnoreCase))
+						foreach (var e in gamePluginZip.Entries)
 						{
-							e.Extract(EditorHelper.SourceCodeDirectory);
-							break;
+							if (string.Equals(Path.GetFileName(e.FullName), Path.GetFileName(userFileEditor), StringComparison.InvariantCultureIgnoreCase))
+							{
+								e.Extract(EditorHelper.SourceCodeDirectory, true);
+								break;
+							}
 						}
 					}
 				}
@@ -867,12 +855,6 @@ namespace Duality.Editor
 					foreach (XElement element in userDoc.Descendants("StartWorkingDirectory", true))
 						element.Value = Path.GetFullPath(".");
 					userDoc.Save(userFileEditor);
-				}
-
-				if (gamePluginZip != null)
-				{
-					gamePluginZip.Dispose();
-					gamePluginZip = null;
 				}
 			}
 
@@ -899,9 +881,10 @@ namespace Duality.Editor
 			// Create solution file if not existing yet
 			if (!File.Exists(EditorHelper.SourceCodeSolutionFile))
 			{
-				using (ZipFile gamePluginZip = ZipFile.Read(Properties.GeneralRes.GamePluginTemplate))
+				using (MemoryStream gamePluginStream = new MemoryStream(Properties.GeneralRes.GamePluginTemplate))
+				using (ZipArchive gamePluginZip = new ZipArchive(gamePluginStream))
 				{
-					gamePluginZip.ExtractAll(EditorHelper.SourceCodeDirectory, ExtractExistingFileAction.DoNotOverwrite);
+					gamePluginZip.ExtractAll(EditorHelper.SourceCodeDirectory, false);
 				}
 			}
 
@@ -1340,7 +1323,7 @@ namespace Duality.Editor
 				}
 				
 				// Perform a buffer swap
-				GLUpdateBufferSwap();
+				PerformBufferSwap();
 
 				// Give the processor a rest if we have the time, don't use 100% CPU
 				while (watch.Elapsed.TotalSeconds < 0.01d)
@@ -1447,11 +1430,13 @@ namespace Duality.Editor
 
 		private static void editorObjects_Registered(object sender, GameObjectEventArgs e)
 		{
-			e.Object.OnActivate();
+			if (e.Object.Active)
+				e.Object.OnActivate();
 		}
 		private static void editorObjects_Unregistered(object sender, GameObjectEventArgs e)
 		{
-			e.Object.OnDeactivate();
+			if (e.Object.Active || e.Object.Disposed)
+				e.Object.OnDeactivate();
 		}
 		private static void editorObjects_ComponentAdded(object sender, ComponentEventArgs e)
 		{

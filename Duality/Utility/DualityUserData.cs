@@ -79,7 +79,6 @@ namespace Duality
 	/// Provides information about user settings for this Duality application / game.
 	/// It is persistent beyond installing or deleting this Duality game.
 	/// </summary>
-	[Serializable]
 	public class DualityUserData
 	{
 		private	string		userName			= "Unknown";
@@ -152,7 +151,7 @@ namespace Duality
 			set { this.systemCursorVisible = value; }
 		}
 		/// <summary>
-		/// [GET / SET] Volume factor of sound effects. This is applied automatically by the <see cref="SoundDevice"/> based on the <see cref="SoundType"/>.
+		/// [GET / SET] Volume factor of sound effects. This is applied automatically by the <see cref="Duality.Audio.SoundDevice"/> based on the <see cref="Duality.Audio.SoundType"/>.
 		/// </summary>
 		public float SfxEffectVol
 		{
@@ -160,7 +159,7 @@ namespace Duality
 			set { this.sfxEffectVol = value; }
 		}
 		/// <summary>
-		/// [GET / SET] Volume factor of speech / vocals. This is applied automatically by the <see cref="SoundDevice"/> based on the <see cref="SoundType"/>.
+		/// [GET / SET] Volume factor of speech / vocals. This is applied automatically by the <see cref="Duality.Audio.SoundDevice"/> based on the <see cref="Duality.Audio.SoundType"/>.
 		/// </summary>
 		public float SfxSpeechVol
 		{
@@ -168,7 +167,7 @@ namespace Duality
 			set { this.sfxSpeechVol = value; }
 		}
 		/// <summary>
-		/// [GET / SET] Volume factor of music. This is applied automatically by the <see cref="SoundDevice"/> based on the <see cref="SoundType"/>.
+		/// [GET / SET] Volume factor of music. This is applied automatically by the <see cref="Duality.Audio.SoundDevice"/> based on the <see cref="Duality.Audio.SoundType"/>.
 		/// </summary>
 		public float SfxMusicVol
 		{
@@ -176,7 +175,7 @@ namespace Duality
 			set { this.sfxMusicVol = value; }
 		}
 		/// <summary>
-		/// [GET / SET] Volume master factor for sound in general. This is applied automatically by the <see cref="SoundDevice"/>.
+		/// [GET / SET] Volume master factor for sound in general. This is applied automatically by the <see cref="Duality.Audio.SoundDevice"/>.
 		/// </summary>
 		public float SfxMasterVol
 		{

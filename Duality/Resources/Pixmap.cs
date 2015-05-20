@@ -14,25 +14,17 @@ using Duality.Serialization;
 using Duality.Cloning;
 using Duality.Properties;
 
-using OpenTK;
-
 namespace Duality.Resources
 {
 	/// <summary>
 	/// A Pixmap stores pixel data in system memory. 
 	/// </summary>
 	/// <seealso cref="Duality.Resources.Texture"/>
-	[Serializable]
 	[ExplicitResourceReference()]
 	[EditorHintCategory(typeof(CoreRes), CoreResNames.CategoryGraphics)]
 	[EditorHintImage(typeof(CoreRes), CoreResNames.ImagePixmap)]
 	public class Pixmap : Resource
 	{
-		/// <summary>
-		/// A Pixmap resources file extension.
-		/// </summary>
-		public new static readonly string FileExt = Resource.GetFileExtByType(typeof(Pixmap));
-
 		/// <summary>
 		/// Represents an unknown Pixmap version.
 		/// </summary>
@@ -396,7 +388,7 @@ namespace Duality.Resources
 				this.height = height;
 				if (this.data == null || this.data.Length != this.width * this.height)
 					this.data = new ColorRgba[this.width * this.height];
-				
+
 				Parallel.ForEach(Partitioner.Create(0, this.data.Length), range =>
 				{
 					for (int i = range.Item1; i < range.Item2; i++)

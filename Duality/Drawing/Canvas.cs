@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using OpenTK.Graphics.OpenGL;
-using OpenTK;
-
 using Duality.Resources;
 using Duality.Cloning;
 
@@ -291,7 +288,7 @@ namespace Duality.Drawing
 				Pixmap.Layer pxLayerDash = new Pixmap.Layer(32, 1);
 				for (int i = 31; i >= 0; i--) pxLayerDash[i, 0] = ((patternBits & (1U << i)) != 0) ? ColorRgba.White : ColorRgba.TransparentWhite;
 				Pixmap pxDash = new Pixmap(pxLayerDash);
-				Texture texDash = new Texture(pxDash, Texture.SizeMode.Stretch, TextureMagFilter.Nearest, TextureMinFilter.Nearest, TextureWrapMode.Repeat);
+				Texture texDash = new Texture(pxDash, TextureSizeMode.Stretch, TextureMagFilter.Nearest, TextureMinFilter.Nearest, TextureWrapMode.Repeat);
 				ContentProvider.AddContent(dashTextPath, texDash);
 			}
 
@@ -645,7 +642,7 @@ namespace Duality.Drawing
 			}
 
 			this.State.TransformVertices(vertices, pos.Xy, scale);
-			this.device.AddVertices(this.State.MaterialDirect, VertexMode.Polygon, vertices, points.Length);
+			this.device.AddVertices(this.State.MaterialDirect, VertexMode.TriangleFan, vertices, points.Length);
 		}
 		/// <summary>
 		/// Fills a polygons outline. All vertices share the same Z value.
@@ -1079,7 +1076,7 @@ namespace Duality.Drawing
 				float baseLuminance = baseColor.GetLuminance();
 
 				this.PushState();
-				this.State.SetMaterial(new Resources.BatchInfo(
+				this.State.SetMaterial(new BatchInfo(
 					Resources.DrawTechnique.Alpha, 
 					(baseLuminance > 0.5f ? ColorRgba.Black : ColorRgba.White).WithAlpha(baseAlpha * backAlpha)));
 				this.State.ColorTint = ColorRgba.White;
@@ -1198,7 +1195,7 @@ namespace Duality.Drawing
 				float baseLuminance = baseColor.GetLuminance();
 
 				this.PushState();
-				this.State.SetMaterial(new Resources.BatchInfo(
+				this.State.SetMaterial(new BatchInfo(
 					Resources.DrawTechnique.Alpha, 
 					(baseLuminance > 0.5f ? ColorRgba.Black : ColorRgba.White).WithAlpha(baseAlpha * backAlpha)));
 				this.State.ColorTint = ColorRgba.White;

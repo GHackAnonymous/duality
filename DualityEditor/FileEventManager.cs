@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Forms;
 using System.Drawing;
@@ -14,9 +15,6 @@ using Duality.Resources;
 using Duality.Serialization;
 using Duality.Editor.Forms;
 
-using OpenTK;
-
-using Ionic.Zip;
 using WeifenLuo.WinFormsUI.Docking;
 
 namespace Duality.Editor
@@ -415,7 +413,7 @@ namespace Duality.Editor
 			if (deleteEvent.IsResource)
 			{
 				Resource res = deleteEvent.Content.Res;
-				if (res.SourcePath != null) mediaPath = res.SourcePath;
+				if (res != null && res.SourcePath != null) mediaPath = res.SourcePath;
 				if (!File.Exists(mediaPath)) mediaPath = FileImportProvider.SelectSourceFilePath(deleteEvent.Content, Path.GetExtension(mediaPath));
 				if (!File.Exists(mediaPath)) return;
 			}
