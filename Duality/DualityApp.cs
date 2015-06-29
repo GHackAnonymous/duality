@@ -366,7 +366,7 @@ namespace Duality
 			AppDomain.CurrentDomain.AssemblyResolve		+= CurrentDomain_AssemblyResolve;
 			AppDomain.CurrentDomain.AssemblyLoad		+= CurrentDomain_AssemblyLoad;
 
-			// Write systems specs as debug log
+			// Write systems specs as a debug log
 			{
 				string osFriendlyName = null;
 				if (Environment.OSVersion.Platform == PlatformID.Win32NT)
@@ -398,28 +398,32 @@ namespace Duality
 			LoadAppData();
 			LoadUserData();
 
-			// Initialize the audio backend
-			InitBackend(out audioBack);
-			sound = new SoundDevice();
-
 			// Initial changed event
 			OnAppDataChanged();
 			OnUserDataChanged();
 
-			Formatter.InitDefaultMethod();
+			// Determine the default serialization method
+			Serializer.InitDefaultMethod();
 
+			// Initialize all core plugins
+			InitPlugins();
+
+			// Initialize the graphics backend
+			InitBackend(out graphicsBack);
+
+			// Initialize the audio backend
+			InitBackend(out audioBack);
+			sound = new SoundDevice();
+			
+			initialized = true;
+
+			// Write environment specs as a debug log
 			Log.Core.Write(
 				"DualityApp initialized" + Environment.NewLine +
 				"Debug Mode: {0}" + Environment.NewLine +
-				"Command line arguments: {1}" + Environment.NewLine +
-				"Is64BitProcess: {2}",
+				"Command line arguments: {1}",
 				System.Diagnostics.Debugger.IsAttached,
-				args != null ? args.ToString(", ") : "null",
-				Environment.Is64BitProcess);
-
-			initialized = true;
-
-			InitPlugins();
+				args != null ? args.ToString(", ") : "null");
 		}
 		/// <summary>
 		/// Opens up a window for Duality to render into. This also initializes the part of Duality that requires a 
@@ -428,8 +432,6 @@ namespace Duality
 		public static INativeWindow OpenWindow(WindowOptions options)
 		{
 			if (!initialized) throw new InvalidOperationException("Can't initialize graphics / rendering because Duality itself isn't initialized yet.");
-
-			if (graphicsBack == null) InitBackend(out graphicsBack);
 
 			Log.Core.Write("Opening Window...");
 			Log.Core.PushIndent();
@@ -446,7 +448,6 @@ namespace Duality
 		/// </summary>
 		public static void InitPostWindow()
 		{
-			if (graphicsBack == null) InitBackend(out graphicsBack);
 			ContentProvider.InitDefaultContent();
 		}
 		/// <summary>
@@ -667,7 +668,7 @@ namespace Duality
 		/// </summary>
 		public static void LoadAppData()
 		{
-			appData = Formatter.TryReadObject<DualityAppData>(AppDataPath) ?? new DualityAppData();
+			appData = Serializer.TryReadObject<DualityAppData>(AppDataPath) ?? new DualityAppData();
 		}
 		/// <summary>
 		/// Triggers Duality to (re)load its <see cref="DualityUserData"/>.
@@ -676,14 +677,14 @@ namespace Duality
 		{
 			string path = UserDataPath;
 			if (!File.Exists(path) || execContext == ExecutionContext.Editor || runFromEditor) path = "DefaultUserData.dat";
-			userData = Formatter.TryReadObject<DualityUserData>(path) ?? new DualityUserData();
+			userData = Serializer.TryReadObject<DualityUserData>(path) ?? new DualityUserData();
 		}
 		/// <summary>
 		/// Triggers Duality to save its <see cref="DualityAppData"/>.
 		/// </summary>
 		public static void SaveAppData()
 		{
-			Formatter.WriteObject(appData, AppDataPath, FormattingMethod.Xml);
+			Serializer.WriteObject(appData, AppDataPath, SerializeMethod.Xml);
 		}
 		/// <summary>
 		/// Triggers Duality to save its <see cref="DualityUserData"/>.
@@ -691,10 +692,10 @@ namespace Duality
 		public static void SaveUserData()
 		{
 			string path = UserDataPath;
-			Formatter.WriteObject(userData, UserDataPath, FormattingMethod.Xml);
+			Serializer.WriteObject(userData, UserDataPath, SerializeMethod.Xml);
 			if (execContext == ExecutionContext.Editor)
 			{
-				Formatter.WriteObject(userData, "DefaultUserData.dat", FormattingMethod.Xml);
+				Serializer.WriteObject(userData, "DefaultUserData.dat", SerializeMethod.Xml);
 			}
 		}
 
@@ -1196,7 +1197,7 @@ namespace Duality
 			availTypeDict.Clear();
 			ReflectionHelper.ClearTypeCache();
 			Component.ClearTypeCache();
-			Formatter.ClearTypeCache();
+			Serializer.ClearTypeCache();
 			CloneProvider.ClearTypeCache();
 			
 			// Clean input sources that a disposed Assembly forgot to unregister.

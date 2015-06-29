@@ -54,6 +54,12 @@ namespace Duality.Backend.DefaultOpenTK
 				options.Height = DisplayDevice.Default.Height;
 			}
 
+			GameWindowFlags windowFlags = GameWindowFlags.Default;
+			if (options.ScreenMode == ScreenMode.FixedWindow)
+				windowFlags = GameWindowFlags.FixedWindow;
+			else if (options.ScreenMode == ScreenMode.Fullscreen || options.ScreenMode == ScreenMode.Native)
+				windowFlags = GameWindowFlags.Fullscreen;
+
 			this.refreshMode = options.RefreshMode;
 			this.internalWindow = new InternalWindow(
 				this,
@@ -61,9 +67,11 @@ namespace Duality.Backend.DefaultOpenTK
 				options.Height,
 				mode,
 				options.Title,
-				GameWindowFlags.Default);
+				windowFlags);
 			this.internalWindow.MakeCurrent();
-			this.internalWindow.CursorVisible = options.SystemCursorVisible;
+			this.internalWindow.CursorVisible = true;
+			if (!options.SystemCursorVisible)
+				this.internalWindow.Cursor = MouseCursor.Empty;
 			this.internalWindow.VSync = (options.RefreshMode != RefreshMode.VSync) ? VSyncMode.Off : VSyncMode.On;
 
 			Log.Core.Write("Window Specification: {0}Mode: {1}{0}VSync: {2}{0}SwapInterval: {3}{0}", 
@@ -85,10 +93,6 @@ namespace Duality.Backend.DefaultOpenTK
 
 			if (options.ScreenMode == ScreenMode.FullWindow)
 				this.internalWindow.WindowState = WindowState.Fullscreen;
-			else if (options.ScreenMode == ScreenMode.FixedWindow)
-				this.internalWindow.WindowBorder = WindowBorder.Fixed;
-			else if (options.ScreenMode == ScreenMode.Window)
-				this.internalWindow.WindowBorder = WindowBorder.Resizable;
 
 			DualityApp.TargetResolution = new Vector2(this.internalWindow.ClientSize.Width, this.internalWindow.ClientSize.Height);
 
